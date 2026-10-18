@@ -1,37 +1,49 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import React, { useState, startTransition } from 'react';
+import { ArrowLeft, Lock, User, Eye, EyeOff, AlertCircle, ShieldAlert, CheckCircle2, UserPlus } from 'lucide-react';
 import VaultraLogo from './VaultraLogo';
 import PullCord from './PullCord';
 import * as api from '../services/api';
-import { getWoodPlank } from '../utils/woodTextures';
 import woodPlank6 from '../assets/wood-plank-6.jpg';
 import woodPlank2 from '../assets/wood-plank-2.jpg';
 
+// Shared singleton AudioContext to prevent synchronous main-thread blocking (Low INP)
+let sharedAudioCtx = null;
+
 function playSwitchSound(isOn) {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+  // Execute audio synthesis on requestAnimationFrame + microtask to ensure zero paint contention
+  requestAnimationFrame(() => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!sharedAudioCtx) {
+        sharedAudioCtx = new AudioCtx();
+      }
+      if (sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume();
+      }
 
-    osc.type = 'triangle';
-    const startFreq = isOn ? 750 : 500;
-    const endFreq = isOn ? 350 : 200;
+      const ctx = sharedAudioCtx;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    osc.frequency.setValueAtTime(startFreq, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + 0.04);
+      osc.type = 'triangle';
+      const startFreq = isOn ? 750 : 500;
+      const endFreq = isOn ? 350 : 200;
 
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+      osc.frequency.setValueAtTime(startFreq, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + 0.04);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.04);
-  } catch {
-    // Ignore audio restriction fallback
-  }
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.04);
+    } catch {
+      // Audio fallback
+    }
+  });
 }
 
 export default function LoginPage({ onBack, onLoginSuccess }) {
@@ -41,18 +53,26 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Interactive Lamp State (True by default)
+  // Interactive Lamp State (Starts false: form hidden until lamp turned on)
   const [isLampOn, setIsLampOn] = useState(false);
 
+  // Setup New Admin state (triggered when logging in with temporary seed admin)
+  const [isSetupAdminStep, setIsSetupAdminStep] = useState(false);
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminConfirmPassword, setNewAdminConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
   const toggleLamp = () => {
-    setIsLampOn((prev) => {
-      const next = !prev;
-      playSwitchSound(next);
-      return next;
+    playSwitchSound(!isLampOn);
+    startTransition(() => {
+      setIsLampOn((prev) => !prev);
     });
   };
 
-  const handleSubmit = async (e) => {
+  // 1. Initial Login Handler
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -71,6 +91,15 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
         username: username.trim(),
         password: password.trim(),
       });
+
+      if (res.user?.isInitial && res.user?.role === 'admin') {
+        startTransition(() => {
+          setIsSetupAdminStep(true);
+        });
+        setError('');
+        return;
+      }
+
       if (onLoginSuccess) {
         onLoginSuccess(res.user);
       }
@@ -79,6 +108,60 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 2. Setup New Permanent Admin Handler
+  const handleSetupAdminSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!newAdminUsername.trim()) {
+      setError('Username admin baru wajib diisi');
+      return;
+    }
+    if (newAdminUsername.trim().toLowerCase() === 'admin') {
+      setError('Gunakan username selain "admin" untuk admin permanen baru Anda');
+      return;
+    }
+    if (!newAdminPassword || newAdminPassword.length < 6) {
+      setError('Password admin baru minimal 6 karakter');
+      return;
+    }
+    if (newAdminPassword !== newAdminConfirmPassword) {
+      setError('Konfirmasi password tidak cocok');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await api.replaceInitialAdmin({
+        newUsername: newAdminUsername.trim(),
+        newName: newAdminName.trim() || 'Administrator',
+        newPassword: newAdminPassword.trim(),
+      });
+
+      if (onLoginSuccess) {
+        onLoginSuccess(res.user);
+      }
+    } catch (err) {
+      setError(err.message || 'Gagal membuat admin baru.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelSetupAdmin = () => {
+    api.logout();
+    startTransition(() => {
+      setIsSetupAdminStep(false);
+      setUsername('');
+      setPassword('');
+      setNewAdminUsername('');
+      setNewAdminName('');
+      setNewAdminPassword('');
+      setNewAdminConfirmPassword('');
+      setError('');
+    });
   };
 
   // Ambient Firefly Particles
@@ -100,36 +183,35 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
   return (
     <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-8 relative overflow-hidden select-none">
       
-      {/* Top Left: Quick Back Navigation */}
-      <div className="absolute top-5 left-5 z-40">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-[#D7C4B0] hover:text-[#FAF8F5] bg-[#140C07]/80 hover:bg-[#140C07] border border-[#4A2E1B]/70 shadow-md transition-all cursor-pointer backdrop-blur-sm"
-          title="Kembali ke Beranda"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 text-[#B48248]" />
-          <span>Kembali</span>
-        </button>
-      </div>
-      
-      {/* 1. Wood Plank 6 Background for Login Page - Lebih Gelap & Berkarakter */}
+      {/* 1. Base Dark Wood Background (Static pre-filtered layer) */}
       <div 
-        className="absolute inset-0 pointer-events-none z-0 transition-all duration-700"
+        className="absolute inset-0 pointer-events-none z-0"
         style={{
           backgroundImage: `url(${woodPlank6})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          filter: isLampOn 
-            ? 'blur(4px) brightness(0.65) saturate(1.2)' 
-            : 'blur(4px) brightness(0.10) saturate(0.4)',
+          filter: 'blur(4px) brightness(0.12) saturate(0.4)',
           transform: 'scale(1.03)',
         }}
       />
 
-      {/* 2. Ambient Intense Golden-Yellow Glow Radiating from the Lamp */}
+      {/* 2. Lit Warm Wood Overlay (Pure GPU opacity transition) */}
       <div 
-        className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
+        className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-400 ease-out will-change-[opacity] ${
+          isLampOn ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          backgroundImage: `url(${woodPlank6})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(4px) brightness(0.65) saturate(1.2)',
+          transform: 'scale(1.03)',
+        }}
+      />
+
+      {/* 3. Ambient Intense Golden-Yellow Glow Radiating from the Lamp */}
+      <div 
+        className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-400 will-change-[opacity] ${
           isLampOn ? 'opacity-65' : 'opacity-0'
         }`}
         style={{
@@ -137,45 +219,47 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
         }}
       />
 
-      {/* 3. Deep Cinematic Room Vignette (Lebih Gelap di Tepian) */}
+      {/* 4. Deep Cinematic Room Vignette */}
       <div className="absolute inset-0 pointer-events-none z-0 bg-gradient-to-b from-black/70 via-transparent to-black/80" />
 
-      {/* 4. Dark Shadow Overlay when Lamp is OFF */}
+      {/* 5. Dark Shadow Overlay when Lamp is OFF */}
       <div 
-        className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
+        className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-400 will-change-[opacity] ${
           isLampOn ? 'opacity-0' : 'opacity-95 bg-[#060403]'
         }`}
       />
 
-      {/* 2. Floating Firefly Particles */}
-      {isLampOn && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {particles.map((p, idx) => (
-            <div
-              key={idx}
-              className={`absolute rounded-full bg-[#FFD15C] shadow-[0_0_8px_2px_rgba(255,209,92,0.8)] animate-pulse ${p.size}`}
-              style={{
-                top: p.top,
-                left: p.left,
-                animationDelay: p.delay,
-                animationDuration: '3s',
-              }}
-            />
-          ))}
-        </div>
-      )}
+      {/* 6. Firefly Particles (Always resident in DOM to prevent layout thrash) */}
+      <div 
+        className={`absolute inset-0 pointer-events-none overflow-hidden transition-opacity duration-500 will-change-[opacity] ${
+          isLampOn ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        {particles.map((p, idx) => (
+          <div
+            key={idx}
+            className={`absolute rounded-full bg-[#FFD15C] shadow-[0_0_6px_1px_rgba(255,209,92,0.7)] animate-pulse ${p.size}`}
+            style={{
+              top: p.top,
+              left: p.left,
+              animationDelay: p.delay,
+              animationDuration: '3s',
+            }}
+          />
+        ))}
+      </div>
 
-      {/* 3. Main Stage: Standing Lamp on Left, Login Card on Right */}
+      {/* Main Stage: Standing Lamp on Left, Login / Setup Card on Right */}
       <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8 lg:gap-16 relative z-10">
         
         {/* ======================================================== */}
-        {/* SEBELAH KIRI: Standing Floor Lamp dengan Alas Kaki Kokoh */}
+        {/* SEBELAH KIRI: Standing Floor Lamp dengan Tali Fleksibel */}
         {/* ======================================================== */}
         <div className="w-full max-w-[340px] sm:max-w-[380px] h-[500px] sm:h-[540px] relative flex flex-col items-center justify-end shrink-0">
           
-          {/* Volumetric Light Cone emanating from bottom edge of shade to the floor (Lebih Terang & Berpendar) */}
+          {/* Volumetric Light Cone */}
           <div
-            className={`absolute top-[96px] sm:top-[112px] left-1/2 -translate-x-1/2 w-[340px] sm:w-[400px] h-[360px] sm:h-[390px] pointer-events-none transition-all duration-700 ease-out z-0 ${
+            className={`absolute top-[96px] sm:top-[112px] left-1/2 -translate-x-1/2 w-[340px] sm:w-[400px] h-[360px] sm:h-[390px] pointer-events-none transition-opacity duration-400 ease-out z-0 will-change-[opacity] ${
               isLampOn ? 'opacity-100' : 'opacity-0'
             }`}
             style={{
@@ -184,83 +268,89 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
             }}
           />
 
-          {/* Lamp Complete Assembly in Natural Top-to-Bottom Flow */}
+          {/* Lamp Complete Assembly */}
           <div className="relative z-10 flex flex-col items-center">
             
-            {/* 1. TOP: Lamp Dome Shade & Glowing Diffuser Assembly */}
+            {/* 1. TOP: Lamp Dome Shade & Glowing Diffuser */}
             <div className="relative flex flex-col items-center z-20">
               
-              {/* Ambient Dark Shadow behind top of Shade (menghalangi cahaya ke atas) */}
               <div className="absolute -top-3 w-48 sm:w-56 h-14 rounded-full bg-black/85 blur-xl pointer-events-none" />
 
-              {/* Outer Glow Halo behind Shade */}
-              {isLampOn && (
-                <div className="absolute inset-0 rounded-full bg-[#FFC843]/30 blur-2xl pointer-events-none transition-opacity duration-700" />
-              )}
+              {/* Ambient Glow behind shade */}
+              <div 
+                className={`absolute inset-0 rounded-full bg-[#FFC843]/30 blur-2xl pointer-events-none transition-opacity duration-400 will-change-[opacity] ${
+                  isLampOn ? 'opacity-100' : 'opacity-0'
+                }`} 
+              />
 
-              {/* Dome Shade (Kap Kubah Hitam Doff Halus) */}
+              {/* Dome Shade */}
               <div 
                 onClick={toggleLamp}
-                className="w-38 sm:w-46 h-18 sm:h-22 rounded-t-full bg-gradient-to-b from-[#282828] via-[#1B1B1B] to-[#0D0D0D] relative overflow-hidden border-t border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.95),inset_0_-3px_6px_rgba(0,0,0,0.9)] cursor-pointer"
+                className="w-38 sm:w-46 h-18 sm:h-22 rounded-t-full bg-gradient-to-b from-[#282828] via-[#1B1B1B] to-[#0D0D0D] relative overflow-hidden border-t border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.95)] cursor-pointer touch-manipulation active:scale-[0.99] transition-transform"
                 title="Klik lampu atau tarik tali saklar"
               >
-                {/* 3D Specular Curved Highlight */}
                 <div className="absolute inset-x-5 top-1.5 h-3.5 rounded-t-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
-                {/* Internal Rim Shadow */}
                 <div className="absolute inset-x-0 bottom-0 h-2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
               </div>
 
               {/* Glowing Underside Diffuser Lens */}
               <div 
                 onClick={toggleLamp}
-                className={`w-36 sm:w-44 h-5 sm:h-6 rounded-full transition-all duration-500 cursor-pointer -mt-2.5 relative z-20 ${
+                className={`w-36 sm:w-44 h-5 sm:h-6 rounded-full transition-colors duration-300 cursor-pointer -mt-2.5 relative z-20 touch-manipulation ${
                   isLampOn
-                    ? 'bg-gradient-to-r from-[#FFCC00] via-[#FFF3B0] to-[#FFB703] shadow-[0_0_25px_8px_#FFCC00,0_0_65px_25px_rgba(255,185,10,0.9),0_0_110px_45px_rgba(255,140,0,0.5)] border border-[#FFE885]'
-                    : 'bg-[#1C1712] shadow-[inset_0_3px_6px_rgba(0,0,0,0.9)] opacity-85 border border-[#2D241C]'
+                    ? 'bg-gradient-to-r from-[#FFCC00] via-[#FFF3B0] to-[#FFB703] border border-[#FFE885]'
+                    : 'bg-[#1C1712] border border-[#2D241C]'
+                }`}
+              />
+              
+              {/* Diffuser Lens Glow Aura (Decoupled GPU layer) */}
+              <div 
+                className={`absolute -bottom-2 w-48 h-8 rounded-full bg-[#FFB703]/50 blur-xl pointer-events-none transition-opacity duration-300 will-change-[opacity] ${
+                  isLampOn ? 'opacity-100' : 'opacity-0'
                 }`}
               />
 
-              {/* Interactive Physics Spring Pull Cord (Bisa Ditarik, Menjepret & Bergelantungan) */}
+              {/* Interactive Physics Spring Pull Cord */}
               <PullCord isLampOn={isLampOn} onToggle={toggleLamp} />
             </div>
 
-            {/* 2. MIDDLE: Vertical Lamp Rod / Tiang Lampu Hitam (Tersambung langsung ke alas kaki) */}
+            {/* 2. MIDDLE: Vertical Lamp Rod */}
             <div className="w-2.5 h-[290px] sm:h-[330px] bg-gradient-to-r from-[#0C0C0C] via-[#2E2E2E] to-[#0A0A0A] shadow-[2px_0_6px_rgba(0,0,0,0.7),-2px_0_6px_rgba(0,0,0,0.7)] relative z-10" />
 
-            {/* 3. BOTTOM: ALAS / KAKI LAMPU (Tatakan bundar/bevel kokoh di atas lantai) */}
+            {/* 3. BOTTOM: ALAS / KAKI LAMPU */}
             <div 
-              className={`w-32 sm:w-40 h-5 sm:h-6 rounded-t-2xl relative z-20 -mt-0.5 transition-all duration-500 overflow-hidden ${
+              className={`w-32 sm:w-40 h-5 sm:h-6 rounded-t-2xl relative z-20 -mt-0.5 transition-colors duration-300 overflow-hidden ${
                 isLampOn
-                  ? 'bg-gradient-to-r from-[#141414] via-[#2C2C2C] to-[#111111] border-t-2 border-[#FFDF80]/60 shadow-[0_-3px_15px_rgba(255,200,80,0.35),0_12px_28px_rgba(0,0,0,0.95)]'
-                  : 'bg-gradient-to-r from-[#121212] via-[#202020] to-[#0E0E0E] border-t border-white/10 shadow-[0_12px_28px_rgba(0,0,0,0.95)]'
+                  ? 'bg-gradient-to-r from-[#141414] via-[#2C2C2C] to-[#111111] border-t-2 border-[#FFDF80]/60'
+                  : 'bg-gradient-to-r from-[#121212] via-[#202020] to-[#0E0E0E] border-t border-white/10'
               }`}
             >
-              {/* Highlight Bevel Permukaan Atas Kaki Lampu */}
               <div className="absolute inset-x-3 top-0.5 h-1.5 rounded-t-xl bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
-              {/* Sisi Bawah Alas Kaki Lampu */}
               <div className="absolute inset-x-0 bottom-0 h-1 bg-[#080808]" />
             </div>
 
-            {/* 4. Floor Contact Shadow (Bayangan lantai gelap tepat di bawah alas kaki) */}
+            {/* Floor Contact Shadow */}
             <div className="w-44 sm:w-54 h-4 rounded-[100%] bg-black/95 blur-md -mt-1.5 pointer-events-none z-0" />
 
-            {/* 5. Floor Light Reflection Puddle (Pendaran cahaya lantai di sekeliling kaki lampu) */}
-            {isLampOn && (
-              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-72 sm:w-84 h-12 rounded-[100%] bg-gradient-to-r from-transparent via-[#FFB703]/50 to-transparent blur-2xl pointer-events-none z-0" />
-            )}
+            {/* Floor Light Reflection Puddle */}
+            <div 
+              className={`absolute -bottom-3 left-1/2 -translate-x-1/2 w-72 sm:w-84 h-12 rounded-[100%] bg-gradient-to-r from-transparent via-[#FFB703]/50 to-transparent blur-2xl pointer-events-none z-0 transition-opacity duration-400 will-change-[opacity] ${
+                isLampOn ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
 
           </div>
 
         </div>
 
-        {/* ======================================================== */}
-        {/* SEBELAH KANAN: Floating Login Card Muncul Saat Lampu ON  */}
-        {/* ======================================================== */}
+        {/* ========================================================================= */}
+        {/* SEBELAH KANAN: Login Card Muncul dengan Fade Biasa (Tanpa Pop up bawah) */}
+        {/* ========================================================================= */}
         <div 
-          className={`w-full max-w-[430px] rounded-3xl p-7 sm:p-9 transition-all duration-700 ease-out relative overflow-hidden backdrop-blur-xl border ${
+          className={`w-full max-w-[440px] rounded-3xl p-7 sm:p-9 transition-opacity duration-400 ease-in-out relative overflow-hidden backdrop-blur-md border border-[#B48248]/60 will-change-[opacity] ${
             isLampOn
-              ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto border-[#B48248]/60 border-l-[#FFCC00] shadow-[0_25px_60px_-10px_rgba(0,0,0,0.95),-15px_0_35px_-5px_rgba(255,190,0,0.35)]'
-              : 'opacity-0 scale-95 translate-y-8 pointer-events-none border-transparent shadow-none'
+              ? 'opacity-100 pointer-events-auto border-l-[#FFCC00] shadow-[0_25px_60px_-10px_rgba(0,0,0,0.95),-15px_0_35px_-5px_rgba(255,190,0,0.35)]'
+              : 'opacity-0 pointer-events-none shadow-none'
           }`}
           style={{
             backgroundImage: `linear-gradient(145deg, rgba(30, 17, 10, 0.88) 0%, rgba(18, 10, 6, 0.94) 100%), url(${woodPlank2})`,
@@ -285,142 +375,252 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
           <div className="absolute bottom-4 left-4 w-1.5 h-1.5 rounded-full bg-[#FFE2A8] shadow-[0_1px_2px_rgba(0,0,0,0.9)] pointer-events-none" />
           <div className="absolute bottom-4 right-4 w-1.5 h-1.5 rounded-full bg-[#FFE2A8] shadow-[0_1px_2px_rgba(0,0,0,0.9)] pointer-events-none" />
 
-          {/* Card Header: Welcome Back with Logo */}
-          <div className="text-center mb-6 pt-2 relative z-10">
-            <div className="flex justify-center mb-3.5">
-              <VaultraLogo variant="icon" size={54} className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]" />
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-md">
-              Welcome Back
-            </h1>
-            <p className="text-xs sm:text-sm text-[#D7C4B0] mt-1.5 font-medium">
-              Akses brankas tautan pribadi Anda
-            </p>
-          </div>
-
           {/* Error Notice */}
           {error && (
-            <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs shadow-inner relative z-10">
+            <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs shadow-inner relative z-10 animate-in fade-in">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
-            
-            {/* Username Field */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#B48248]">
-                <User className="w-4 h-4" />
+          {/* KONDISI 1: STEP SETUP ADMIN BARU */}
+          {isSetupAdminStep ? (
+            <div className="relative z-10 animate-in fade-in duration-300">
+              
+              <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-[#2D1B0F]/90 border border-[#FFCC00]/50 text-[#FFE3B3] text-xs shadow-sm">
+                <ShieldAlert className="w-5 h-5 shrink-0 text-[#FFCC00]" />
+                <div className="text-[11px] leading-snug">
+                  <span className="font-bold text-[#FFCC00] block mb-0.5">Akun Seed Admin Sementara Aktif</span>
+                  Silakan buat akun Admin baru Anda. Akun seed sementara (<code className="text-[#FFD15C] font-mono">admin</code>) akan langsung terhapus otomatis begitu Admin baru ini disimpan.
+                </div>
               </div>
-              <input
-                type="text"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
-                className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
-              />
-            </div>
 
-            {/* Password Field */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#B48248]">
-                <Lock className="w-4 h-4" />
+              <div className="text-center mb-5">
+                <h2 className="text-xl sm:text-2xl font-extrabold text-[#FAF8F5] drop-shadow-md flex items-center justify-center gap-2">
+                  <UserPlus className="w-5 h-5 text-[#FFCC00]" />
+                  <span>Daftarkan Admin Baru</span>
+                </h2>
+                <p className="text-xs text-[#D7C4B0] mt-1 font-medium">
+                  Pengalihan akun administrator permanen sistem
+                </p>
               </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                className="w-full pl-11 pr-11 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#9E826A] hover:text-[#FAF8F5] cursor-pointer"
-                aria-label="Lihat password"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+
+              <form onSubmit={handleSetupAdminSubmit} className="space-y-3.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-[#D7C4B0] uppercase tracking-wider mb-1">
+                    Username Admin Baru <span className="text-[#FFCC00]">*</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#B48248]">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      value={newAdminUsername}
+                      onChange={(e) => setNewAdminUsername(e.target.value)}
+                      placeholder="Contoh: ade7 atau superadmin"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#D7C4B0] uppercase tracking-wider mb-1">
+                    Nama Lengkap Admin
+                  </label>
+                  <input
+                    type="text"
+                    value={newAdminName}
+                    onChange={(e) => setNewAdminName(e.target.value)}
+                    placeholder="Contoh: Ade Pratama"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#D7C4B0] uppercase tracking-wider mb-1">
+                    Password Baru <span className="text-[#FFCC00]">* (Min. 6 Karakter)</span>
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#B48248]">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                      placeholder="Password baru"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9E826A] hover:text-[#FAF8F5] cursor-pointer"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[#D7C4B0] uppercase tracking-wider mb-1">
+                    Konfirmasi Password <span className="text-[#FFCC00]">*</span>
+                  </label>
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={newAdminConfirmPassword}
+                    onChange={(e) => setNewAdminConfirmPassword(e.target.value)}
+                    placeholder="Ulangi password baru"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 px-4 mt-3 rounded-2xl text-xs sm:text-sm font-black text-[#1C1008] bg-gradient-to-r from-[#FFCC00] via-[#FFD633] to-[#FFAA00] hover:brightness-110 active:brightness-95 border border-[#FFE2A8]/70 shadow-[0_8px_25px_rgba(255,204,0,0.4)] hover:shadow-[0_12px_32px_rgba(255,204,0,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-50 tracking-wide flex items-center justify-center gap-2 touch-manipulation"
+                >
+                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                  <span>{loading ? 'Menyimpan & Menghapus Akun Lama...' : 'Simpan Admin & Hapus Akun Seed'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCancelSetupAdmin}
+                  disabled={loading}
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-[#D7C4B0] hover:text-[#FAF8F5] bg-[#140C07]/60 hover:bg-[#140C07] border border-[#4A2E1B]/60 transition-all cursor-pointer text-center touch-manipulation"
+                >
+                  Batal & Keluar Sesi
+                </button>
+              </form>
             </div>
+          ) : (
+            /* KONDISI 2: STANDARD LOGIN FORM */
+            <div className="relative z-10 animate-in fade-in duration-300">
+              
+              <div className="text-center mb-6 pt-2">
+                <div className="flex justify-center mb-3.5">
+                  <VaultraLogo variant="icon" size={54} className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]" />
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-md">
+                  Welcome Back
+                </h1>
+                <p className="text-xs sm:text-sm text-[#D7C4B0] mt-1.5 font-medium">
+                  Akses brankas tautan pribadi Anda
+                </p>
+              </div>
 
-            {/* Primary Action Button: Glowing Yellow / Amber Woodcraft Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 px-4 mt-2 rounded-2xl text-sm font-black text-[#1C1008] bg-gradient-to-r from-[#FFCC00] via-[#FFD633] to-[#FFAA00] hover:brightness-110 active:brightness-95 border border-[#FFE2A8]/70 shadow-[0_8px_25px_rgba(255,204,0,0.4)] hover:shadow-[0_12px_32px_rgba(255,204,0,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-50 tracking-wide"
-            >
-              {loading ? 'Memproses Masuk...' : 'Sign In'}
-            </button>
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#B48248]">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Username"
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                  />
+                </div>
 
-            {/* Kembali Button to Dashboard */}
-            <button
-              type="button"
-              onClick={onBack}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs font-semibold text-[#D7C4B0] hover:text-[#FAF8F5] bg-[#140C07]/60 hover:bg-[#140C07] border border-[#4A2E1B]/60 transition-all cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-[#B48248]" />
-              <span>Kembali ke Beranda</span>
-            </button>
-
-            {/* Hallmark Signature: MADE BY ADE7 (SVG) */}
-            <div className="pt-2 flex justify-center items-center">
-              <svg 
-                viewBox="0 0 220 32" 
-                fill="none" 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="w-48 sm:w-52 h-auto opacity-75 hover:opacity-100 transition-opacity drop-shadow-sm select-none"
-                aria-label="Made By Ade7"
-              >
-                <defs>
-                  <linearGradient id="ade7Gold" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#FFE5B4" />
-                    <stop offset="50%" stopColor="#E5B57A" />
-                    <stop offset="100%" stopColor="#FFCC00" />
-                  </linearGradient>
-                  <linearGradient id="ade7Line" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#B48248" stopOpacity="0" />
-                    <stop offset="50%" stopColor="#FFCC00" stopOpacity="0.85" />
-                    <stop offset="100%" stopColor="#B48248" stopOpacity="0" />
-                  </linearGradient>
-                  <filter id="ade7Glow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#FFCC00" floodOpacity="0.45" />
-                  </filter>
-                </defs>
-
-                {/* Left Accent Wing */}
-                <line x1="10" y1="16" x2="48" y2="16" stroke="url(#ade7Line)" strokeWidth="1.2" strokeLinecap="round" />
-                <polygon points="53,16 56,13 59,16 56,19" fill="#FFCC00" opacity="0.9" />
-
-                {/* Centered Typography: MADE BY ADE7 */}
-                <g filter="url(#ade7Glow)">
-                  <text 
-                    x="110" 
-                    y="20" 
-                    fontFamily="system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif" 
-                    fontSize="10.5" 
-                    fontWeight="800" 
-                    letterSpacing="3.2" 
-                    textAnchor="middle" 
-                    fill="url(#ade7Gold)"
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#B48248]">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Password"
+                    className="w-full pl-11 pr-11 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#9E826A] hover:text-[#FAF8F5] cursor-pointer touch-manipulation"
+                    aria-label="Lihat password"
                   >
-                    MADE BY ADE7
-                  </text>
-                </g>
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
 
-                {/* Right Accent Wing */}
-                <polygon points="161,16 164,13 167,16 164,19" fill="#FFCC00" opacity="0.9" />
-                <line x1="172" y1="16" x2="210" y2="16" stroke="url(#ade7Line)" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3.5 px-4 mt-2 rounded-2xl text-sm font-black text-[#1C1008] bg-gradient-to-r from-[#FFCC00] via-[#FFD633] to-[#FFAA00] hover:brightness-110 active:brightness-95 border border-[#FFE2A8]/70 shadow-[0_8px_25px_rgba(255,204,0,0.4)] hover:shadow-[0_12px_32px_rgba(255,204,0,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-50 tracking-wide touch-manipulation"
+                >
+                  {loading ? 'Memproses Masuk...' : 'Sign In'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onBack}
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs font-semibold text-[#D7C4B0] hover:text-[#FAF8F5] bg-[#140C07]/60 hover:bg-[#140C07] border border-[#4A2E1B]/60 transition-all cursor-pointer touch-manipulation"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 text-[#B48248]" />
+                  <span>Kembali ke Beranda</span>
+                </button>
+
+                <div className="pt-2 flex justify-center items-center">
+                  <svg 
+                    viewBox="0 0 220 32" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    className="w-48 sm:w-52 h-auto opacity-75 hover:opacity-100 transition-opacity drop-shadow-sm select-none"
+                    aria-label="Made By Ade7"
+                  >
+                    <defs>
+                      <linearGradient id="ade7Gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#FFE5B4" />
+                        <stop offset="50%" stopColor="#E5B57A" />
+                        <stop offset="100%" stopColor="#FFCC00" />
+                      </linearGradient>
+                      <linearGradient id="ade7Line" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#B48248" stopOpacity="0" />
+                        <stop offset="50%" stopColor="#FFCC00" stopOpacity="0.85" />
+                        <stop offset="100%" stopColor="#B48248" stopOpacity="0" />
+                      </linearGradient>
+                      <filter id="ade7Glow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#FFCC00" floodOpacity="0.45" />
+                      </filter>
+                    </defs>
+
+                    <line x1="10" y1="16" x2="48" y2="16" stroke="url(#ade7Line)" strokeWidth="1.2" strokeLinecap="round" />
+                    <polygon points="53,16 56,13 59,16 56,19" fill="#FFCC00" opacity="0.9" />
+
+                    <g filter="url(#ade7Glow)">
+                      <text 
+                        x="110" 
+                        y="20" 
+                        fontFamily="system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif" 
+                        fontSize="10.5" 
+                        fontWeight="800" 
+                        letterSpacing="3.2" 
+                        textAnchor="middle" 
+                        fill="url(#ade7Gold)"
+                      >
+                        MADE BY ADE7
+                      </text>
+                    </g>
+
+                    <polygon points="161,16 164,13 167,16 164,19" fill="#FFCC00" opacity="0.9" />
+                    <line x1="172" y1="16" x2="210" y2="16" stroke="url(#ade7Line)" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                </div>
+
+              </form>
             </div>
+          )}
 
-          </form>
-
-          {/* Bottom Wood Plank Accent Line */}
           <div 
             className="absolute bottom-0 left-0 right-0 h-2 opacity-75" 
             style={{ 
@@ -435,6 +635,3 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
     </div>
   );
 }
-
-
-

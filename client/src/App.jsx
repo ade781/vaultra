@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, startTransition } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
@@ -9,7 +9,6 @@ import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
 import * as api from './services/api';
 import { Globe, Lock } from 'lucide-react';
-import { getWoodPlank } from './utils/woodTextures';
 import woodPlank4 from './assets/wood-plank-4.jpg';
 import woodPlank1 from './assets/wood-plank-1.jpg';
 
@@ -42,9 +41,15 @@ export default function App() {
     const savedUser = api.getCurrentUser();
     if (savedUser) {
       setCurrentUser(savedUser);
-      // Optional verification
       api.getMe()
-        .then((user) => setCurrentUser(user))
+        .then((user) => {
+          setCurrentUser(user);
+          if (user.isInitial && user.role === 'admin') {
+            startTransition(() => {
+              setCurrentView('login');
+            });
+          }
+        })
         .catch(() => {
           api.logout();
           setCurrentUser(null);
@@ -52,7 +57,7 @@ export default function App() {
     }
   }, []);
 
-  // 2. Fetch items (Semua user, termasuk belum login, bisa melihat data publik & private)
+  // 2. Fetch items
   const loadItems = useCallback(async () => {
     try {
       setLoading(true);
@@ -71,16 +76,34 @@ export default function App() {
     loadItems();
   }, [loadItems]);
 
+  // Non-blocking Concurrent View Navigators (Low INP)
+  const handleNavigateLogin = () => {
+    startTransition(() => {
+      setCurrentView('login');
+    });
+  };
+
+  const handleNavigateDashboard = () => {
+    startTransition(() => {
+      setCurrentView('dashboard');
+    });
+  };
+
   // Auth Handlers
   const handleLoginSuccess = (user) => {
-    setCurrentUser(user);
-    setCurrentView('dashboard');
-    setToastMessage(`Selamat datang kembali, ${user.name || user.username}!`);
+    startTransition(() => {
+      setCurrentUser(user);
+      setCurrentView('dashboard');
+    });
+    const roleText = user.role === 'admin' ? 'Administrator' : 'Pengguna';
+    setToastMessage(`Selamat datang, ${user.name || user.username} (${roleText})!`);
   };
 
   const handleLogout = () => {
     api.logout();
-    setCurrentUser(null);
+    startTransition(() => {
+      setCurrentUser(null);
+    });
     setToastMessage('Anda telah keluar dari akun');
   };
 
@@ -101,12 +124,10 @@ export default function App() {
   const handleSaveItem = async (formData, id) => {
     try {
       if (id) {
-        // Edit mode
         const updated = await api.updateItem(id, formData);
         setItems((prev) => prev.map((it) => (it.id === id ? updated : it)));
         setToastMessage('Tautan berhasil diperbarui');
       } else {
-        // Add mode
         const newItem = await api.createItem(formData);
         setItems((prev) => [newItem, ...prev]);
         setToastMessage('Tautan berhasil ditambahkan ke brankas');
@@ -138,65 +159,64 @@ export default function App() {
   if (currentView === 'login') {
     return (
       <LoginPage
-        onBack={() => setCurrentView('dashboard')}
+        onBack={handleNavigateDashboard}
         onLoginSuccess={handleLoginSuccess}
       />
     );
   }
 
-  // Dashboard View (Main Page with Sidebar on Left)
   return (
-    <div className="min-h-[100dvh] flex text-[#261C14] relative overflow-x-hidden">
-      {/* 1. Wood Plank 4 Background for Main Dashboard (Kayu Cerah: wood-plank-4.jpg) */}
+    <div className="min-h-screen bg-[#FDFBF7] text-[#261C14] flex flex-col md:flex-row relative">
+      
+      {/* Background Wood Texture for Whole Dashboard with blur(5px) to preserve wood grain character */}
       <div 
-        className="fixed inset-0 pointer-events-none z-0"
+        className="fixed inset-0 pointer-events-none z-0" 
         style={{
           backgroundImage: `url(${woodPlank4})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          filter: 'blur(5px) brightness(1.04)',
-          transform: 'scale(1.03)',
+          filter: 'blur(5px) brightness(0.96) saturate(0.9)',
+          transform: 'scale(1.04)',
         }}
       />
-      {/* Soft Light Overlay to keep dashboard luminous, crisp & readable */}
-      <div className="fixed inset-0 pointer-events-none z-0 bg-[#FAF7F2]/75" />
+      <div className="fixed inset-0 pointer-events-none z-0 bg-[#FAF8F5]/88 backdrop-blur-xs" />
 
-      {/* 2. Left Sidebar (Semi-transparent floating over the blurred wood) */}
+      {/* 1. Left Sidebar Navigation */}
       <Sidebar
         user={currentUser}
-        onNavigateLogin={() => {
-          setIsSidebarMobileOpen(false);
-          setCurrentView('login');
-        }}
+        onNavigateLogin={handleNavigateLogin}
         onLogout={handleLogout}
         isOpenMobile={isSidebarMobileOpen}
         onCloseMobile={() => setIsSidebarMobileOpen(false)}
       />
 
-      {/* 3. Main Workspace Layout */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen relative z-10">
-        {/* Top Navbar */}
+      {/* 2. Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 z-10">
+        
+        {/* Sticky Top Navbar */}
         <Navbar
           onOpenAddModal={handleOpenAddModal}
-          onToggleSidebar={() => setIsSidebarMobileOpen((prev) => !prev)}
+          onToggleSidebar={() => setIsSidebarMobileOpen(true)}
           totalItems={items.length}
         />
 
-        {/* Content Area */}
+        {/* Content Body */}
         <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          {/* Kontainer Kayu Memanjang: Judul 'Tautan' di Kiri, Filter di Kanan */}
+
+          {/* Container Batang Kayu Penuh (Full-Width Wooden Plank Container Bar) */}
           <div 
-            className="w-full rounded-2xl px-5 sm:px-6 py-3.5 mb-6 shadow-md border border-[#4A2E1B]/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 relative overflow-hidden"
+            className="w-full mb-6 px-5 py-3.5 rounded-2xl border border-[#B48248]/60 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden"
             style={{
-              backgroundImage: `linear-gradient(rgba(36, 20, 12, 0.72), rgba(46, 26, 14, 0.85)), url(${woodPlank1})`,
+              backgroundImage: `linear-gradient(rgba(35, 18, 9, 0.76), rgba(48, 25, 12, 0.88)), url(${woodPlank1})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
             }}
           >
-            {/* Subtle Brass Inlay Border */}
-            <div className="absolute inset-0 border border-[#D4A373]/35 rounded-2xl pointer-events-none" />
+            {/* Top Gloss & Brass Inlay */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FFE3B3]/60 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#B48248]/50 to-transparent" />
 
-            {/* Sebelah Kiri: Judul Tautan Minimalis */}
+            {/* Sebelah Kiri: Teks "Tautan" Sederhana & Minimalis */}
             <div className="flex items-center gap-2.5 relative z-10">
               <div className="w-2 h-2 rounded-full bg-[#FFDF80] shadow-[0_0_6px_rgba(255,223,128,0.8)]" />
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-sm">
@@ -298,9 +318,8 @@ export default function App() {
 
         </main>
 
-        {/* Footer / Bottom Bar - Lebih Kuning Hangat seperti Kayu & Teks Bersih */}
+        {/* Footer / Bottom Bar */}
         <footer className="border-t border-[#E5DACB] bg-[#FBF5EB]/95 py-6 text-center text-xs text-[#8C7460] mt-auto relative shadow-inner">
-          {/* Subtle Top Wood Accent Strip on Bottom Bar */}
           <div 
             className="absolute top-0 left-0 right-0 h-0.5 opacity-70"
             style={{
@@ -317,10 +336,11 @@ export default function App() {
         </footer>
       </div>
 
-      {/* 3. Modal Form (Add & Edit) */}
+      {/* 3. Modal Form (Add & Edit) dengan currentUser */}
       <ItemModal
         isOpen={isModalOpen}
         initialData={editingItem}
+        currentUser={currentUser}
         onClose={() => {
           setIsModalOpen(false);
           setEditingItem(null);
@@ -328,7 +348,7 @@ export default function App() {
         onSubmit={handleSaveItem}
       />
 
-      {/* 4. Pop-up Detail Modal / Layer 2 (Dengan Barcode, Status Privasi, dan Desain Ramping) */}
+      {/* 4. Pop-up Detail Modal */}
       <ItemDetailModal
         isOpen={Boolean(selectedItemForPopup)}
         item={selectedItemForPopup}
@@ -345,6 +365,3 @@ export default function App() {
     </div>
   );
 }
-
-
-

@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -51,6 +51,19 @@ export async function deleteItem(id) {
 // Auth API
 export async function login({ username, password }) {
   const data = await apiClient.post('/auth/login', { username, password });
+  if (data.token) {
+    localStorage.setItem('vaultra_token', data.token);
+    localStorage.setItem('vaultra_user', JSON.stringify(data.user));
+  }
+  return data;
+}
+
+export async function replaceInitialAdmin({ newUsername, newName, newPassword }) {
+  const data = await apiClient.post('/auth/replace-initial-admin', {
+    newUsername,
+    newName,
+    newPassword,
+  });
   if (data.token) {
     localStorage.setItem('vaultra_token', data.token);
     localStorage.setItem('vaultra_user', JSON.stringify(data.user));
