@@ -9,12 +9,10 @@ dist-ssr/
 build/
 *.local
 
-# Environment variables
+# Environment variables (protect all secrets, allow .env.example)
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
 # Logs
 npm-debug.log*

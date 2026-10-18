@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
+// Load environment files: .env.{NODE_ENV} first, then .env
+const nodeEnv = process.env.NODE_ENV || 'development';
+dotenv.config({ path: path.resolve(__dirname, `../.env.${nodeEnv}`) });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config();
 
