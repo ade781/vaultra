@@ -168,18 +168,13 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#261C14] flex flex-col md:flex-row relative">
       
-      {/* Background Wood Texture for Whole Dashboard with blur(5px) to preserve wood grain character */}
+      {/* High-Performance Ambient Wood Parchment Canvas (0ms LCP / Zero GPU overhead) */}
       <div 
         className="fixed inset-0 pointer-events-none z-0" 
         style={{
-          backgroundImage: `url(${woodPlank4})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'blur(5px) brightness(0.96) saturate(0.9)',
-          transform: 'scale(1.04)',
+          background: 'radial-gradient(ellipse at 50% 0%, #FCFAF7 0%, #F5EFE6 55%, #ECE3D4 100%)',
         }}
       />
-      <div className="fixed inset-0 pointer-events-none z-0 bg-[#FAF8F5]/88 backdrop-blur-xs" />
 
       {/* 1. Left Sidebar Navigation */}
       <Sidebar
@@ -203,13 +198,11 @@ export default function App() {
         {/* Content Body */}
         <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
-          {/* Container Batang Kayu Penuh (Full-Width Wooden Plank Container Bar) */}
+          {/* Container Batang Kayu Penuh (Ultra-Fast 0ms LCP CSS Woodcraft Plank) */}
           <div 
             className="w-full mb-6 px-5 py-3.5 rounded-2xl border border-[#B48248]/60 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden"
             style={{
-              backgroundImage: `linear-gradient(rgba(35, 18, 9, 0.76), rgba(48, 25, 12, 0.88)), url(${woodPlank1})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
+              background: 'linear-gradient(135deg, #2D1A0E 0%, #3F2413 45%, #241308 100%)',
             }}
           >
             {/* Top Gloss & Brass Inlay */}
@@ -323,9 +316,7 @@ export default function App() {
           <div 
             className="absolute top-0 left-0 right-0 h-0.5 opacity-70"
             style={{
-              backgroundImage: `url(${woodPlank1})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
+              background: 'linear-gradient(90deg, #B48248 0%, #FFE3B3 50%, #B48248 100%)',
             }}
           />
           <div className="max-w-6xl mx-auto px-4">

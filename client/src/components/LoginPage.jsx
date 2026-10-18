@@ -399,6 +399,9 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
               </div>
 
               <div className="text-center mb-5">
+                <div className="flex justify-center mb-3">
+                  <VaultraLogo variant="icon" size={46} className="drop-shadow-md" />
+                </div>
                 <h2 className="text-xl sm:text-2xl font-extrabold text-[#FAF8F5] drop-shadow-md flex items-center justify-center gap-2">
                   <UserPlus className="w-5 h-5 text-[#FFCC00]" />
                   <span>Daftarkan Admin Baru</span>
@@ -508,8 +511,7 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
               
               <div className="text-center mb-4 sm:mb-6 pt-1 sm:pt-2">
                 <div className="flex justify-center mb-3.5">
-                  <VaultraLogo variant="icon" size={44} className="sm:hidden drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]" />
-                  <VaultraLogo variant="icon" size={54} className="hidden sm:block drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]" />
+                  <VaultraLogo variant="icon" size={56} className="drop-shadow-[0_4px_18px_rgba(0,0,0,0.9)]" />
                 </div>
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-md">
                   Welcome Back

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, AlertCircle, PlusCircle, Edit3, Globe, Lock, Share2, UserCheck } from 'lucide-react';
+import { X, Check, Globe, Lock, Share2 } from 'lucide-react';
+import VaultraLogo from './VaultraLogo';
 import * as api from '../services/api';
-import { getWoodPlank } from '../utils/woodTextures';
 
 export default function ItemModal({
   isOpen,
@@ -22,21 +22,24 @@ export default function ItemModal({
   const [error, setError] = useState('');
 
   const inputRef = useRef(null);
-  const woodTexture = getWoodPlank(initialData?.id || initialData?.title || 4);
 
-  // Fetch available users from backend
+  // Fetch available users from backend once when modal opens
   useEffect(() => {
+    let isMounted = true;
     if (isOpen) {
       api.getUsers()
         .then((users) => {
-          if (Array.isArray(users)) {
+          if (isMounted && Array.isArray(users)) {
             setUsersList(users);
           }
         })
         .catch(() => {
-          setUsersList([]);
+          if (isMounted) setUsersList([]);
         });
     }
+    return () => {
+      isMounted = false;
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -44,22 +47,26 @@ export default function ItemModal({
       if (initialData) {
         setTitle(initialData.title || '');
         setUrl(initialData.url || '');
-        setCreator(initialData.creator === 'Anonim' ? (currentUser?.name || currentUser?.username || '') : initialData.creator || '');
+        setCreator(
+          initialData.creator === 'Anonim'
+            ? currentUser?.name || currentUser?.username || ''
+            : initialData.creator || ''
+        );
         setSourceEmail(initialData.sourceEmail || '');
         setIsPrivate(Boolean(initialData.isPrivate));
         setSharedWith(initialData.sharedWith || '');
       } else {
         setTitle('');
         setUrl('');
-        // Ketika sudah login, nama otomatis terinput di pembuat
-        setCreator(currentUser ? (currentUser.name || currentUser.username) : '');
+        // When logged in, creator is pre-filled automatically
+        setCreator(currentUser ? currentUser.name || currentUser.username : '');
         setSourceEmail('');
         setIsPrivate(false);
         setSharedWith('');
       }
       setError('');
       setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen, initialData, currentUser]);
 
@@ -90,8 +97,10 @@ export default function ItemModal({
       return;
     }
 
-    // Validasi: Ketika user BELUM login, dia WAJIB mengisi nama pembuat
-    const resolvedCreator = currentUser ? (currentUser.name || currentUser.username) : creator.trim();
+    // Validation for guest user
+    const resolvedCreator = currentUser
+      ? currentUser.name || currentUser.username
+      : creator.trim();
     if (!currentUser && (!resolvedCreator || resolvedCreator.toLowerCase() === 'anonim')) {
       setError('Nama pembuat wajib diisi karena Anda belum login');
       return;
@@ -99,14 +108,17 @@ export default function ItemModal({
 
     try {
       setLoading(true);
-      await onSubmit({
-        title: title.trim(),
-        url: url.trim(),
-        creator: resolvedCreator,
-        sourceEmail: sourceEmail.trim() || null,
-        isPrivate: Boolean(isPrivate),
-        sharedWith: isPrivate && sharedWith.trim() ? sharedWith.trim() : null,
-      }, initialData?.id);
+      await onSubmit(
+        {
+          title: title.trim(),
+          url: url.trim(),
+          creator: resolvedCreator,
+          sourceEmail: sourceEmail.trim() || null,
+          isPrivate: Boolean(isPrivate),
+          sharedWith: isPrivate && sharedWith.trim() ? sharedWith.trim() : null,
+        },
+        initialData?.id
+      );
       onClose();
     } catch (err) {
       setError(err.message || 'Gagal menyimpan tautan');
@@ -116,36 +128,37 @@ export default function ItemModal({
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#261C14]/40 backdrop-blur-xs animate-in fade-in duration-150 overflow-y-auto"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#140B06]/65 overflow-y-auto"
       onClick={onClose}
     >
-      <div 
+      <div
         className="w-full max-w-lg rounded-3xl bg-[#FFFFFF] border border-[#E5DACB] shadow-2xl overflow-hidden my-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Prominent Wood Plank Modal Header */}
-        <div 
-          className="relative px-6 py-5 border-b border-[#3D271D]/50 flex items-center justify-between overflow-hidden shadow-sm"
+        {/* Modal Header with Vaultra Logo & Brass Inlay */}
+        <div
+          className="relative px-6 py-4 sm:py-5 border-b border-[#3D271D]/60 flex items-center justify-between overflow-hidden shadow-sm"
           style={{
-            backgroundImage: `linear-gradient(rgba(35, 20, 12, 0.72), rgba(48, 28, 16, 0.86)), url(${woodTexture})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
+            background: 'linear-gradient(135deg, #2D1A0E 0%, #3D2314 50%, #201107 100%)',
           }}
         >
+          {/* Top Brass Hairline Inlay */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FFE3B3]/60 to-transparent pointer-events-none" />
+
           <div className="flex items-center gap-3 relative z-10">
-            <div className="w-9 h-9 rounded-xl bg-[#FAF8F5]/10 border border-[#D4A373]/50 flex items-center justify-center text-[#FFE8C2] shadow-xs">
-              {isEditing ? (
-                <Edit3 className="w-4.5 h-4.5 stroke-[2.2]" />
-              ) : (
-                <PlusCircle className="w-4.5 h-4.5 stroke-[2.2]" />
-              )}
-            </div>
+            {/* Official Vaultra Logo */}
+            <VaultraLogo variant="icon" size={36} className="drop-shadow-md" />
             <div>
-              <h2 className="text-base font-extrabold text-[#FAF8F5] drop-shadow-xs">
-                {isEditing ? 'Perbarui Tautan Brankas' : 'Tambah Tautan ke Brankas'}
-              </h2>
-              <span className="text-[11px] font-semibold text-[#D4A373] block mt-0.5">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-extrabold text-[#FAF8F5] drop-shadow-xs">
+                  {isEditing ? 'Perbarui Tautan Brankas' : 'Tambah Tautan ke Brankas'}
+                </h2>
+                <span className="text-[10px] font-mono font-bold bg-[#FFCC00]/20 text-[#FFE3B3] px-2 py-0.5 rounded-full border border-[#FFCC00]/30 hidden sm:inline-block">
+                  Vaultra
+                </span>
+              </div>
+              <span className="text-[11px] font-medium text-[#D4A373] block mt-0.5">
                 {isEditing ? 'Ubah informasi atau hak akses tautan' : 'Simpan link dengan perlindungan privasi'}
               </span>
             </div>
@@ -161,19 +174,17 @@ export default function ItemModal({
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          
+        {/* Modal Form Body - Zero lag / instant INP inputs */}
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
           {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
               <span>{error}</span>
             </div>
           )}
 
-          {/* 1. Judul */}
+          {/* 1. Judul Link */}
           <div>
-            <label className="block text-xs font-semibold text-[#261C14] mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
               Judul Link <span className="text-rose-500">*</span>
             </label>
             <input
@@ -182,14 +193,14 @@ export default function ItemModal({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Masukkan judul link"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-all"
+              placeholder="Contoh: netflix overlay atau Dokumen Proyek"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-colors duration-100"
             />
           </div>
 
-          {/* 2. Link / URL */}
+          {/* 2. Link URL */}
           <div>
-            <label className="block text-xs font-semibold text-[#261C14] mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
               Link URL <span className="text-rose-500">*</span>
             </label>
             <input
@@ -197,23 +208,22 @@ export default function ItemModal({
               required
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://..."
-              className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] font-mono transition-all"
+              placeholder="https://drive.google.com/..."
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-colors duration-100 font-mono text-xs sm:text-sm"
             />
           </div>
 
-          {/* 3. Pembuat & 4. Asal Email (Grid 2 Kolom) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* 3. Baris Pembuat & Asal Email */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               {currentUser ? (
-                /* Ketika SUDAH Login: Otomatis terinput & terkunci */
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-[#261C14] uppercase tracking-wider">
+                    <label className="text-xs font-bold text-[#261C14] uppercase tracking-wider">
                       Pembuat
                     </label>
-                    <span className="text-[10px] font-bold text-[#4A6B3D] bg-[#F0F6EE] px-1.5 py-0.5 rounded flex items-center gap-1 border border-[#4A6B3D]/20">
-                      <UserCheck className="w-3 h-3 stroke-[2.5]" /> Otomatis
+                    <span className="text-[10px] font-bold text-[#4A6B3D] bg-[#F0F6EE] px-1.5 py-0.5 rounded border border-[#4A6B3D]/30">
+                      Otomatis
                     </span>
                   </div>
                   <div className="relative">
@@ -221,7 +231,7 @@ export default function ItemModal({
                       type="text"
                       readOnly
                       value={currentUser.name || currentUser.username}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5EEDB] border border-[#D8C7B4] text-[#261C14] text-sm font-semibold cursor-not-allowed select-none shadow-xs"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5EEDB] border border-[#D8C7B4] text-[#261C14] text-sm font-semibold cursor-not-allowed select-none"
                     />
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-[#786858] text-[11px] font-mono">
                       @{currentUser.username}
@@ -232,10 +242,9 @@ export default function ItemModal({
                   </span>
                 </div>
               ) : (
-                /* Ketika BELUM Login: WAJIB mengisi nama pembuat */
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-[#261C14] uppercase tracking-wider">
+                    <label className="text-xs font-bold text-[#261C14] uppercase tracking-wider">
                       Pembuat <span className="text-rose-500">*</span>
                     </label>
                     <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
@@ -248,7 +257,7 @@ export default function ItemModal({
                     value={creator}
                     onChange={(e) => setCreator(e.target.value)}
                     placeholder="Nama Anda (Wajib diisi)"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-all"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-colors duration-100"
                   />
                   <span className="text-[10px] text-[#8C6239] mt-1 block">
                     Wajib mengisi nama pembuat karena Anda belum masuk.
@@ -258,7 +267,7 @@ export default function ItemModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#261C14] mb-1.5 uppercase tracking-wider">
+              <label className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
                 Asal Email
               </label>
               <input
@@ -266,14 +275,14 @@ export default function ItemModal({
                 value={sourceEmail}
                 onChange={(e) => setSourceEmail(e.target.value)}
                 placeholder="email (Opsional)"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-colors duration-100"
               />
             </div>
           </div>
 
-          {/* 5. Fitur Publik / Private */}
+          {/* 4. Fitur Publik / Private */}
           <div className="pt-2">
-            <label className="block text-xs font-semibold text-[#261C14] mb-2 uppercase tracking-wider">
+            <label className="block text-xs font-bold text-[#261C14] mb-2 uppercase tracking-wider">
               Status Privasi Link
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -284,20 +293,26 @@ export default function ItemModal({
                   setIsPrivate(false);
                   setSharedWith('');
                 }}
-                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-colors cursor-pointer ${
                   !isPrivate
-                    ? 'bg-[#F0F6EE] border-[#4A6B3D] text-[#2A4520] shadow-xs ring-1 ring-[#4A6B3D]/30'
+                    ? 'bg-[#F0F6EE] border-[#4A6B3D] text-[#2A4520] ring-1 ring-[#4A6B3D]/30'
                     : 'bg-[#FAF8F5] border-[#E5DACB] text-[#786858] hover:border-[#B48248]'
                 }`}
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                  !isPrivate ? 'bg-[#4A6B3D] text-white' : 'bg-[#FFFFFF] border border-[#E5DACB] text-[#9E8C7C]'
-                }`}>
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    !isPrivate
+                      ? 'bg-[#4A6B3D] text-white'
+                      : 'bg-[#FFFFFF] border border-[#E5DACB] text-[#9E8C7C]'
+                  }`}
+                >
                   <Globe className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-xs font-bold block">Publik</span>
-                  <span className="text-[10px] text-[#786858] block leading-tight">Terbuka untuk umum</span>
+                  <span className="text-[10px] text-[#786858] block leading-tight">
+                    Terbuka untuk umum
+                  </span>
                 </div>
               </button>
 
@@ -305,28 +320,34 @@ export default function ItemModal({
               <button
                 type="button"
                 onClick={() => setIsPrivate(true)}
-                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                className={`flex items-center gap-2.5 p-3 rounded-xl border text-left transition-colors cursor-pointer ${
                   isPrivate
-                    ? 'bg-[#FBF0E4] border-[#8C6239] text-[#5E3F21] shadow-xs ring-1 ring-[#8C6239]/30'
+                    ? 'bg-[#FBF0E4] border-[#8C6239] text-[#5E3F21] ring-1 ring-[#8C6239]/30'
                     : 'bg-[#FAF8F5] border-[#E5DACB] text-[#786858] hover:border-[#B48248]'
                 }`}
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                  isPrivate ? 'bg-[#8C6239] text-white' : 'bg-[#FFFFFF] border border-[#E5DACB] text-[#9E8C7C]'
-                }`}>
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                    isPrivate
+                      ? 'bg-[#8C6239] text-white'
+                      : 'bg-[#FFFFFF] border border-[#E5DACB] text-[#9E8C7C]'
+                  }`}
+                >
                   <Lock className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-xs font-bold block">Private</span>
-                  <span className="text-[10px] text-[#786858] block leading-tight">Akses terbatas</span>
+                  <span className="text-[10px] text-[#786858] block leading-tight">
+                    Akses terbatas
+                  </span>
                 </div>
               </button>
             </div>
           </div>
 
-          {/* 6. Dropdown Berbagi ke User Tertentu (Jika Private Aktif) */}
+          {/* 5. Dropdown Berbagi ke User Tertentu (Jika Private Aktif) */}
           {isPrivate && (
-            <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#E5DACB] space-y-2 animate-in fade-in duration-200">
+            <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#E5DACB] space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-[#8C6239]">
                 <Share2 className="w-3.5 h-3.5" />
                 <span>Bagikan Akses Private ke User:</span>
@@ -335,7 +356,7 @@ export default function ItemModal({
                 <select
                   value={sharedWith}
                   onChange={(e) => setSharedWith(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#FFFFFF] border border-[#E5DACB] text-[#261C14] text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#8C6239]/30 focus:border-[#8C6239] transition-all cursor-pointer"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#FFFFFF] border border-[#E5DACB] text-[#261C14] text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#8C6239]/30 focus:border-[#8C6239] transition-colors cursor-pointer"
                 >
                   <option value="">(Hanya saya / Simpan pribadi)</option>
                   {usersList.map((u) => (
@@ -361,11 +382,9 @@ export default function ItemModal({
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#FAF8F5] border border-[#B48248]/50 shadow-sm shadow-[#8C6239]/20 hover:shadow-md hover:shadow-[#8C6239]/30 transition-all disabled:opacity-50 cursor-pointer" 
-              style={{ 
-                backgroundImage: `linear-gradient(rgba(74, 46, 27, 0.75), rgba(46, 27, 14, 0.85)), url(${woodTexture})`, 
-                backgroundSize: "cover", 
-                backgroundPosition: "center" 
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-[#FAF8F5] border border-[#B48248]/50 shadow-sm transition-opacity cursor-pointer disabled:opacity-50"
+              style={{
+                background: 'linear-gradient(135deg, #4A2E1B 0%, #2E1B0E 100%)',
               }}
             >
               {loading ? (
@@ -378,7 +397,6 @@ export default function ItemModal({
               )}
             </button>
           </div>
-
         </form>
       </div>
     </div>

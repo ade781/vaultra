@@ -1,18 +1,18 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 /**
  * VaultraLogo - Pure Minimalist SVG Logo & Icon Component for Vaultra
- * Crafted with Anti-Slop & Design-Taste guidelines:
- * - Zero CPU-heavy SVG drop-shadow filters (100% vector scalability & ultra-low INP)
- * - Clean geometric shackle arch + bold architectural 'V' + precision vault keyhole
- * - High-contrast palette: Rich Dark Obsidian Walnut & Warm Polished Brass
- * - Fully accessible with proper aria labels and WCAG AA compliance
- *
- * @param {'icon' | 'full'} variant - 'icon' renders emblem mark only, 'full' renders emblem + logotype
- * @param {number} size - pixel dimension (for icon: size x size; for full: mark size)
- * @param {string} className - optional extra tailwind classes
+ * Enhanced with useId() to prevent SVG gradient collisions across SPA renders.
+ * 100% vector scalability, zero layout thrashing, ultra-fast render.
  */
 export default function VaultraLogo({ variant = 'icon', size = 36, className = '' }) {
+  const rawId = useId();
+  // Sanitize id for valid CSS/SVG selector
+  const safeId = rawId.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const darkGradId = `vaultraDark_${safeId}`;
+  const brassGradId = `vaultraBrass_${safeId}`;
+  const glowGradId = `vaultraGlow_${safeId}`;
+
   const iconMark = (
     <svg
       width={size}
@@ -25,58 +25,65 @@ export default function VaultraLogo({ variant = 'icon', size = 36, className = '
     >
       <defs>
         {/* Obsidian Walnut Wood Plaque Gradient */}
-        <linearGradient id="vaultraDarkBase" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#25170F" />
-          <stop offset="100%" stopColor="#120A05" />
+        <linearGradient id={darkGradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#2A180E" />
+          <stop offset="50%" stopColor="#1C1008" />
+          <stop offset="100%" stopColor="#100804" />
         </linearGradient>
 
         {/* Polished Warm Brass Metallic Gradient */}
-        <linearGradient id="vaultraBrass" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id={brassGradId} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#FFF2CE" />
-          <stop offset="35%" stopColor="#F5BF4F" />
-          <stop offset="100%" stopColor="#B8731F" />
+          <stop offset="30%" stopColor="#F5BF4F" />
+          <stop offset="70%" stopColor="#D49132" />
+          <stop offset="100%" stopColor="#9C5D17" />
+        </linearGradient>
+
+        {/* Subtle Brass Shimmer Glow */}
+        <linearGradient id={glowGradId} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FFE3B3" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#B48248" stopOpacity="0.1" />
         </linearGradient>
       </defs>
 
       {/* 1. Architectural Squircle Plaque */}
       <rect
-        x="10"
-        y="10"
-        width="108"
-        height="108"
-        rx="28"
-        fill="url(#vaultraDarkBase)"
-        stroke="#8C5C2E"
-        strokeWidth="2"
+        x="8"
+        y="8"
+        width="112"
+        height="112"
+        rx="30"
+        fill={`url(#${darkGradId})`}
+        stroke="#B48248"
+        strokeWidth="2.5"
       />
 
       {/* 2. Delicate Gold Hairline Border Inlay */}
       <rect
-        x="15"
-        y="15"
-        width="98"
-        height="98"
-        rx="23"
+        x="13.5"
+        y="13.5"
+        width="101"
+        height="101"
+        rx="25"
         fill="none"
-        stroke="#F5BF4F"
-        strokeWidth="0.8"
-        strokeOpacity="0.3"
+        stroke={`url(#${glowGradId})`}
+        strokeWidth="1.2"
       />
 
       {/* 3. Vault Padlock Arch (Shackle) */}
       <path
-        d="M45 52 V38 C45 27.5 53.5 19 64 19 C74.5 19 83 27.5 83 38 V52"
-        stroke="url(#vaultraBrass)"
-        strokeWidth="6"
+        d="M44 54 V36 C44 25 53 16 64 16 C75 16 84 25 84 36 V54"
+        stroke={`url(#${brassGradId})`}
+        strokeWidth="7"
         strokeLinecap="round"
         fill="none"
       />
 
       {/* 4. Bold Geometric 'V' Monogram */}
       <path
-        d="M34 48 L61.5 94 C62.8 96.2 65.2 96.2 66.5 94 L94 48"
-        stroke="url(#vaultraBrass)"
-        strokeWidth="7"
+        d="M33 46 L61.5 96 C62.8 98.2 65.2 98.2 66.5 96 L95 46"
+        stroke={`url(#${brassGradId})`}
+        strokeWidth="7.5"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
@@ -86,13 +93,13 @@ export default function VaultraLogo({ variant = 'icon', size = 36, className = '
       <circle
         cx="64"
         cy="62"
-        r="9.5"
-        fill="#120A05"
-        stroke="url(#vaultraBrass)"
-        strokeWidth="2"
+        r="11"
+        fill="#140A05"
+        stroke={`url(#${brassGradId})`}
+        strokeWidth="2.2"
       />
-      <circle cx="64" cy="59.5" r="2.4" fill="#FFF2CE" />
-      <polygon points="62.5,60 65.5,60 64.9,66.5 63.1,66.5" fill="#FFF2CE" />
+      <circle cx="64" cy="59" r="2.8" fill="#FFF2CE" />
+      <polygon points="62.2,59.5 65.8,59.5 65.1,67 62.9,67" fill="#FFF2CE" />
     </svg>
   );
 
