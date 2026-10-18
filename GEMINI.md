@@ -1,4 +1,4 @@
-# Workspace Instructions & Rules
+# Global GEMINI Instructions & Rules
 
 ## Browser Testing Restriction
 - **STRICT RULE**: JANGAN PERNAH gunakan tool `browser_subagent` atau membuka browser otomatis untuk pengujian/testing.
