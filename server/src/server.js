@@ -1,10 +1,11 @@
-const express = require('express');
+﻿const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
 const itemRoutes = require('./routes/itemRoutes');
+const authRoutes = require('./routes/authRoutes');
 const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
@@ -43,6 +44,7 @@ app.get('/api/health', (req, res) => {
 
 // Mount Resource Routes
 app.use('/api/items', itemRoutes);
+app.use('/api/auth', authRoutes);
 
 // 404 Handler
 app.use((req, res) => {
