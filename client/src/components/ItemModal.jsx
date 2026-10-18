@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, AlertCircle, PlusCircle, Edit3, Globe, Lock, Share2, Users } from 'lucide-react';
+import { X, Check, AlertCircle, PlusCircle, Edit3, Globe, Lock, Share2 } from 'lucide-react';
 import * as api from '../services/api';
+import { getWoodPlank } from '../utils/woodTextures';
 
 export default function ItemModal({
   isOpen,
@@ -20,8 +21,9 @@ export default function ItemModal({
   const [error, setError] = useState('');
 
   const inputRef = useRef(null);
+  const woodTexture = getWoodPlank(initialData?.id || initialData?.title || 4);
 
-  // Fetch available users for sharing
+  // Fetch available users from backend
   useEffect(() => {
     if (isOpen) {
       api.getUsers()
@@ -31,13 +33,7 @@ export default function ItemModal({
           }
         })
         .catch(() => {
-          // Fallback static users if network error
-          setUsersList([
-            { id: 1, username: 'admin', name: 'Admin Vaultra' },
-            { id: 2, username: 'budi', name: 'Budi Santoso' },
-            { id: 3, username: 'siti', name: 'Siti Rahma' },
-            { id: 4, username: 'adit', name: 'Aditya Pratama' },
-          ]);
+          setUsersList([]);
         });
     }
   }, [isOpen]);
@@ -119,13 +115,17 @@ export default function ItemModal({
         className="w-full max-w-lg rounded-3xl bg-[#FFFFFF] border border-[#E5DACB] shadow-2xl overflow-hidden my-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Top Wood Accent Line */}
-        <div className="h-2 w-full bg-gradient-to-r from-[#5E3F21] via-[#8C6239] to-[#B48248]" />
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#F5EFEB] bg-[#FAF8F5]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#8C6239] to-[#5E3F21] text-[#FAF8F5] flex items-center justify-center shadow-xs border border-[#B48248]/40">
+        {/* Prominent Wood Plank Modal Header */}
+        <div 
+          className="relative px-6 py-5 border-b border-[#3D271D]/50 flex items-center justify-between overflow-hidden shadow-sm"
+          style={{
+            backgroundImage: `linear-gradient(rgba(35, 20, 12, 0.72), rgba(48, 28, 16, 0.86)), url(${woodTexture})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        >
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-9 h-9 rounded-xl bg-[#FAF8F5]/10 border border-[#D4A373]/50 flex items-center justify-center text-[#FFE8C2] shadow-xs">
               {isEditing ? (
                 <Edit3 className="w-4.5 h-4.5 stroke-[2.2]" />
               ) : (
@@ -133,19 +133,19 @@ export default function ItemModal({
               )}
             </div>
             <div>
-              <h2 className="text-base font-bold text-[#261C14]">
-                {isEditing ? 'Edit Tautan' : 'Tambah Tautan Baru'}
+              <h2 className="text-base font-extrabold text-[#FAF8F5] drop-shadow-xs">
+                {isEditing ? 'Perbarui Tautan Brankas' : 'Tambah Tautan ke Brankas'}
               </h2>
-              <p className="text-[11px] text-[#9E8C7C]">
-                Isi rincian tautan & tentukan hak akses privasi
-              </p>
+              <span className="text-[11px] font-semibold text-[#D4A373] block mt-0.5">
+                {isEditing ? 'Ubah informasi atau hak akses tautan' : 'Simpan link dengan perlindungan privasi'}
+              </span>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[#9E8C7C] hover:text-[#261C14] hover:bg-[#EFEAE1] transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-[#E5DACB] hover:text-white hover:bg-white/10 transition-colors cursor-pointer relative z-10"
             aria-label="Tutup form"
           >
             <X className="w-5 h-5" />
@@ -173,7 +173,7 @@ export default function ItemModal({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Contoh: Proposal Riset & Dokumen Strategis"
+              placeholder="Masukkan judul link"
               className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-all"
             />
           </div>
@@ -203,7 +203,7 @@ export default function ItemModal({
                 type="text"
                 value={creator}
                 onChange={(e) => setCreator(e.target.value)}
-                placeholder="Nama Anda (Opsional)"
+                placeholder="Nama pembuat (Opsional)"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-all"
               />
             </div>
@@ -216,13 +216,13 @@ export default function ItemModal({
                 type="email"
                 value={sourceEmail}
                 onChange={(e) => setSourceEmail(e.target.value)}
-                placeholder="email@domain.com"
+                placeholder="email (Opsional)"
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-all"
               />
             </div>
           </div>
 
-          {/* 5. Fitur Publik / Private (Sesuai Instruksi User) */}
+          {/* 5. Fitur Publik / Private */}
           <div className="pt-2">
             <label className="block text-xs font-semibold text-[#261C14] mb-2 uppercase tracking-wider">
               Status Privasi Link
@@ -296,13 +296,10 @@ export default function ItemModal({
                   ))}
                 </select>
               </div>
-              <p className="text-[11px] text-[#9E8C7C] leading-relaxed">
-                Pilih rekan pengguna untuk memberikan hak kolaborasi tautan ini.
-              </p>
             </div>
           )}
 
-          {/* Footer Actions with Warm Wood Styling */}
+          {/* Footer Actions */}
           <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#F5EFEB]">
             <button
               type="button"
@@ -315,7 +312,7 @@ export default function ItemModal({
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#FAF8F5] bg-gradient-to-r from-[#8C6239] via-[#7B5430] to-[#5E3F21] hover:from-[#7B5430] hover:to-[#4A2E1B] border border-[#B48248]/50 shadow-sm shadow-[#8C6239]/20 hover:shadow-md hover:shadow-[#8C6239]/30 transition-all disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-[#FAF8F5] border border-[#B48248]/50 shadow-sm shadow-[#8C6239]/20 hover:shadow-md hover:shadow-[#8C6239]/30 transition-all disabled:opacity-50 cursor-pointer" style={{ backgroundImage: `linear-gradient(rgba(74, 46, 27, 0.75), rgba(46, 27, 14, 0.85)), url(${woodTexture})`, backgroundSize: "cover", backgroundPosition: "center" }}
             >
               {loading ? (
                 <span>Menyimpan...</span>
@@ -333,3 +330,5 @@ export default function ItemModal({
     </div>
   );
 }
+
+
