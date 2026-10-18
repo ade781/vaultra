@@ -1,6 +1,6 @@
 // Guaranteed environment defaults for Supabase Cloud
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://postgres.bnkvuniwxgqmxxaoodyh:Adeasli781781@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres';
+  process.env.DATABASE_URL = 'postgresql://postgres.bnkvuniwxgqmxxaoodyh:Adeasli781781@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1';
 }
 if (!process.env.JWT_SECRET) {
   process.env.JWT_SECRET = 'vaultra_jwt_secret_wood_key_2026';
