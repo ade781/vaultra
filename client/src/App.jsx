@@ -9,8 +9,6 @@ import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
 import * as api from './services/api';
 import { Globe, Lock } from 'lucide-react';
-import woodPlank4 from './assets/wood-plank-4.jpg';
-import woodPlank1 from './assets/wood-plank-1.jpg';
 
 export default function App() {
   // Navigation View: 'dashboard' | 'login'
