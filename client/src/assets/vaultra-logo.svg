@@ -1,105 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 72" fill="none">
   <defs>
-    <!-- Background Wooden Texture Gradient -->
-    <linearGradient id="vlWoodGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3D2415"/>
-      <stop offset="35%" stop-color="#5C361F"/>
-      <stop offset="70%" stop-color="#442817"/>
-      <stop offset="100%" stop-color="#24140B"/>
+    <linearGradient id="vlDarkBase" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#25170F"/>
+      <stop offset="100%" stop-color="#120A05"/>
     </linearGradient>
-
-    <!-- Brass / Gold Metallic Gradients -->
-    <linearGradient id="vlBrassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="vlBrass" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#FFF2CE"/>
-      <stop offset="25%" stop-color="#E5B57A"/>
-      <stop offset="50%" stop-color="#D49746"/>
-      <stop offset="75%" stop-color="#FFCC00"/>
-      <stop offset="100%" stop-color="#8C5824"/>
+      <stop offset="35%" stop-color="#F5BF4F"/>
+      <stop offset="100%" stop-color="#B8731F"/>
     </linearGradient>
-
     <linearGradient id="vlTextGrad" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#FAF8F5"/>
       <stop offset="60%" stop-color="#FCEBD4"/>
       <stop offset="100%" stop-color="#E5B57A"/>
     </linearGradient>
-
-    <linearGradient id="vlLockCore" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1A0F08"/>
-      <stop offset="100%" stop-color="#2D1A0E"/>
-    </linearGradient>
-
-    <filter id="vlShadow" x="-10%" y="-10%" width="120%" height="130%" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.5"/>
-    </filter>
-
-    <filter id="vlGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#FFCC00" flood-opacity="0.4"/>
-    </filter>
   </defs>
 
-  <!-- Left: Icon Mark -->
-  <g transform="translate(8, 8)">
-    <!-- Wooden Squircle Plaque -->
-    <rect x="0" y="0" width="64" height="64" rx="16" fill="url(#vlWoodGrad)" stroke="#B48248" stroke-width="1.8" filter="url(#vlShadow)"/>
-
-    <!-- Wood Seams -->
-    <line x1="2" y1="23" x2="62" y2="23" stroke="#1F1109" stroke-width="1.2" opacity="0.6"/>
-    <line x1="2" y1="42" x2="62" y2="42" stroke="#1F1109" stroke-width="1.2" opacity="0.6"/>
-
-    <!-- Brass Inner Border -->
-    <rect x="4" y="4" width="56" height="56" rx="12" fill="none" stroke="url(#vlBrassGrad)" stroke-width="0.9" stroke-opacity="0.7"/>
-
-    <!-- Corner Rivets -->
-    <circle cx="8" cy="8" r="1.5" fill="#FFE2A8"/>
-    <circle cx="56" cy="8" r="1.5" fill="#FFE2A8"/>
-    <circle cx="8" cy="56" r="1.5" fill="#FFE2A8"/>
-    <circle cx="56" cy="56" r="1.5" fill="#FFE2A8"/>
-
-    <!-- Vault Shackle & 'V' Monogram -->
-    <g filter="url(#vlGlow)">
-      <path d="M23 27 C23 20 27 16 32 16 C37 16 41 20 41 27" 
-            stroke="url(#vlBrassGrad)" stroke-width="3.5" stroke-linecap="round" fill="none"/>
-      
-      <path d="M18 24 L29 48 C30 50 34 50 35 48 L46 24" 
-            stroke="url(#vlBrassGrad)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-      
-      <!-- Keyhole Center -->
-      <circle cx="32" cy="32" r="7.5" fill="url(#vlLockCore)" stroke="url(#vlBrassGrad)" stroke-width="1.4"/>
-      <circle cx="32" cy="30.5" r="2" fill="#FFDF80"/>
-      <polygon points="30.8,31 33.2,31 32.7,35 31.3,35" fill="#FFDF80"/>
-    </g>
+  <!-- Left Icon Mark -->
+  <g transform="translate(6, 6) scale(0.46875)">
+    <rect x="10" y="10" width="108" height="108" rx="28" fill="url(#vlDarkBase)" stroke="#8C5C2E" stroke-width="2"/>
+    <rect x="15" y="15" width="98" height="98" rx="23" fill="none" stroke="#F5BF4F" stroke-width="0.8" stroke-opacity="0.3"/>
+    <path d="M45 52 V38 C45 27.5 53.5 19 64 19 C74.5 19 83 27.5 83 38 V52" stroke="url(#vlBrass)" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <path d="M34 48 L61.5 94 C62.8 96.2 65.2 96.2 66.5 94 L94 48" stroke="url(#vlBrass)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="64" cy="62" r="9.5" fill="#120A05" stroke="url(#vlBrass)" stroke-width="2"/>
+    <circle cx="64" cy="59.5" r="2.4" fill="#FFF2CE"/>
+    <polygon points="62.5,60 65.5,60 64.9,66.5 63.1,66.5" fill="#FFF2CE"/>
   </g>
 
-  <!-- Right: Typography -->
-  <g transform="translate(86, 0)">
-    <!-- Brand Title: VAULTRA -->
-    <text x="0" y="44" 
+  <!-- Right Typography -->
+  <g transform="translate(74, 0)">
+    <text x="0" y="38" 
           font-family="system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif" 
-          font-size="31" 
+          font-size="28" 
           font-weight="800" 
-          letter-spacing="2.5" 
-          fill="url(#vlTextGrad)"
-          filter="url(#vlShadow)">
+          letter-spacing="2" 
+          fill="url(#vlTextGrad)">
       VAULTRA
     </text>
-
-    <!-- Subtitle & Woodcraft Bar -->
-    <g transform="translate(1, 58)">
-      <!-- Left decorative dash -->
-      <line x1="0" y1="2" x2="16" y2="2" stroke="url(#vlBrassGrad)" stroke-width="1.5" stroke-linecap="round"/>
-      
-      <!-- Tagline -->
-      <text x="22" y="5" 
-            font-family="system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif" 
-            font-size="9.5" 
-            font-weight="700" 
-            letter-spacing="3.2" 
-            fill="#D4A373">
-        WOODCRAFT VAULT
-      </text>
-
-      <!-- Right decorative dash -->
-      <line x1="172" y1="2" x2="188" y2="2" stroke="url(#vlBrassGrad)" stroke-width="1.5" stroke-linecap="round"/>
-    </g>
+    <text x="1" y="54" 
+          font-family="system-ui, -apple-system, 'JetBrains Mono', monospace" 
+          font-size="8.5" 
+          font-weight="700" 
+          letter-spacing="3" 
+          fill="#D4A373">
+      WOODCRAFT VAULT
+    </text>
   </g>
 </svg>

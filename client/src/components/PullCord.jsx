@@ -193,7 +193,7 @@ export default function PullCord({ isLampOn, onToggle }) {
 
   return (
     <div
-      className="absolute top-18 sm:top-22 right-4 sm:right-6 z-30 select-none touch-none cursor-grab active:cursor-grabbing will-change-transform"
+      className="absolute top-14 sm:top-18 md:top-22 right-2 sm:right-4 md:right-6 z-30 select-none touch-none cursor-grab active:cursor-grabbing will-change-transform"
       style={{ width: `${svgWidth}px`, height: `${svgHeight}px`, touchAction: 'none' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

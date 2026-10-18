@@ -181,7 +181,7 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
   ];
 
   return (
-    <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-8 relative overflow-hidden select-none">
+    <div className="min-h-[100dvh] w-full flex items-center justify-center p-3 sm:p-6 md:p-8 py-4 sm:py-8 relative overflow-hidden select-none">
       
       {/* 1. Base Dark Wood Background (Static pre-filtered layer) */}
       <div 
@@ -250,16 +250,16 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
       </div>
 
       {/* Main Stage: Standing Lamp on Left, Login / Setup Card on Right */}
-      <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8 lg:gap-16 relative z-10">
+      <div className="w-full max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-center gap-3 sm:gap-6 md:gap-12 lg:gap-16 relative z-10">
         
         {/* ======================================================== */}
         {/* SEBELAH KIRI: Standing Floor Lamp dengan Tali Fleksibel */}
         {/* ======================================================== */}
-        <div className="w-full max-w-[340px] sm:max-w-[380px] h-[500px] sm:h-[540px] relative flex flex-col items-center justify-end shrink-0">
+        <div className="w-full max-w-[320px] sm:max-w-[360px] md:max-w-[380px] h-auto md:h-[540px] relative flex flex-col items-center justify-start md:justify-end shrink-0 pt-1 pb-1 md:py-0">
           
           {/* Volumetric Light Cone */}
           <div
-            className={`absolute top-[96px] sm:top-[112px] left-1/2 -translate-x-1/2 w-[340px] sm:w-[400px] h-[360px] sm:h-[390px] pointer-events-none transition-opacity duration-400 ease-out z-0 will-change-[opacity] ${
+            className={`absolute top-[62px] sm:top-[78px] md:top-[112px] left-1/2 -translate-x-1/2 w-[290px] sm:w-[350px] md:w-[400px] h-[280px] sm:h-[340px] md:h-[390px] pointer-events-none transition-opacity duration-400 ease-out z-0 will-change-[opacity] ${
               isLampOn ? 'opacity-100' : 'opacity-0'
             }`}
             style={{
@@ -271,10 +271,13 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
           {/* Lamp Complete Assembly */}
           <div className="relative z-10 flex flex-col items-center">
             
+            {/* Ceiling Suspension Cable on Mobile (Transforms to Pendant Lamp) */}
+            <div className="block md:hidden w-1 h-5 sm:h-7 bg-gradient-to-b from-black/90 to-[#2A1D13] rounded-full mb-0.5 shadow-sm pointer-events-none" />
+
             {/* 1. TOP: Lamp Dome Shade & Glowing Diffuser */}
             <div className="relative flex flex-col items-center z-20">
               
-              <div className="absolute -top-3 w-48 sm:w-56 h-14 rounded-full bg-black/85 blur-xl pointer-events-none" />
+              <div className="absolute -top-3 w-40 sm:w-48 md:w-56 h-12 md:h-14 rounded-full bg-black/85 blur-xl pointer-events-none" />
 
               {/* Ambient Glow behind shade */}
               <div 
@@ -286,17 +289,17 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
               {/* Dome Shade */}
               <div 
                 onClick={toggleLamp}
-                className="w-38 sm:w-46 h-18 sm:h-22 rounded-t-full bg-gradient-to-b from-[#282828] via-[#1B1B1B] to-[#0D0D0D] relative overflow-hidden border-t border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.95)] cursor-pointer touch-manipulation active:scale-[0.99] transition-transform"
+                className="w-32 sm:w-38 md:w-46 h-14 sm:h-18 md:h-22 rounded-t-full bg-gradient-to-b from-[#282828] via-[#1B1B1B] to-[#0D0D0D] relative overflow-hidden border-t border-white/20 shadow-[0_12px_24px_rgba(0,0,0,0.95)] cursor-pointer touch-manipulation active:scale-[0.99] transition-transform"
                 title="Klik lampu atau tarik tali saklar"
               >
-                <div className="absolute inset-x-5 top-1.5 h-3.5 rounded-t-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+                <div className="absolute inset-x-4 sm:inset-x-5 top-1.5 h-3.5 rounded-t-full bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
                 <div className="absolute inset-x-0 bottom-0 h-2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
               </div>
 
               {/* Glowing Underside Diffuser Lens */}
               <div 
                 onClick={toggleLamp}
-                className={`w-36 sm:w-44 h-5 sm:h-6 rounded-full transition-colors duration-300 cursor-pointer -mt-2.5 relative z-20 touch-manipulation ${
+                className={`w-30 sm:w-36 md:w-44 h-4.5 sm:h-5 md:h-6 rounded-full transition-colors duration-300 cursor-pointer -mt-2 sm:-mt-2.5 relative z-20 touch-manipulation ${
                   isLampOn
                     ? 'bg-gradient-to-r from-[#FFCC00] via-[#FFF3B0] to-[#FFB703] border border-[#FFE885]'
                     : 'bg-[#1C1712] border border-[#2D241C]'
@@ -315,11 +318,11 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
             </div>
 
             {/* 2. MIDDLE: Vertical Lamp Rod */}
-            <div className="w-2.5 h-[290px] sm:h-[330px] bg-gradient-to-r from-[#0C0C0C] via-[#2E2E2E] to-[#0A0A0A] shadow-[2px_0_6px_rgba(0,0,0,0.7),-2px_0_6px_rgba(0,0,0,0.7)] relative z-10" />
+            <div className="hidden md:block w-2.5 h-[290px] sm:h-[330px] bg-gradient-to-r from-[#0C0C0C] via-[#2E2E2E] to-[#0A0A0A] shadow-[2px_0_6px_rgba(0,0,0,0.7),-2px_0_6px_rgba(0,0,0,0.7)] relative z-10" />
 
             {/* 3. BOTTOM: ALAS / KAKI LAMPU */}
             <div 
-              className={`w-32 sm:w-40 h-5 sm:h-6 rounded-t-2xl relative z-20 -mt-0.5 transition-colors duration-300 overflow-hidden ${
+              className={`hidden md:block w-32 sm:w-40 h-5 sm:h-6 rounded-t-2xl relative z-20 -mt-0.5 transition-colors duration-300 overflow-hidden ${
                 isLampOn
                   ? 'bg-gradient-to-r from-[#141414] via-[#2C2C2C] to-[#111111] border-t-2 border-[#FFDF80]/60'
                   : 'bg-gradient-to-r from-[#121212] via-[#202020] to-[#0E0E0E] border-t border-white/10'
@@ -330,11 +333,11 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
             </div>
 
             {/* Floor Contact Shadow */}
-            <div className="w-44 sm:w-54 h-4 rounded-[100%] bg-black/95 blur-md -mt-1.5 pointer-events-none z-0" />
+            <div className="hidden md:block w-44 sm:w-54 h-4 rounded-[100%] bg-black/95 blur-md -mt-1.5 pointer-events-none z-0" />
 
             {/* Floor Light Reflection Puddle */}
             <div 
-              className={`absolute -bottom-3 left-1/2 -translate-x-1/2 w-72 sm:w-84 h-12 rounded-[100%] bg-gradient-to-r from-transparent via-[#FFB703]/50 to-transparent blur-2xl pointer-events-none z-0 transition-opacity duration-400 will-change-[opacity] ${
+              className={`hidden md:block absolute -bottom-3 left-1/2 -translate-x-1/2 w-72 sm:w-84 h-12 rounded-[100%] bg-gradient-to-r from-transparent via-[#FFB703]/50 to-transparent blur-2xl pointer-events-none z-0 transition-opacity duration-400 will-change-[opacity] ${
                 isLampOn ? 'opacity-100' : 'opacity-0'
               }`}
             />
@@ -347,7 +350,7 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
         {/* SEBELAH KANAN: Login Card Muncul dengan Fade Biasa (Tanpa Pop up bawah) */}
         {/* ========================================================================= */}
         <div 
-          className={`w-full max-w-[440px] rounded-3xl p-7 sm:p-9 transition-opacity duration-400 ease-in-out relative overflow-hidden backdrop-blur-md border border-[#B48248]/60 will-change-[opacity] ${
+          className={`w-full max-w-[440px] rounded-3xl p-5 sm:p-7 md:p-9 transition-opacity duration-400 ease-in-out relative overflow-hidden backdrop-blur-md border border-[#B48248]/60 will-change-[opacity] ${
             isLampOn
               ? 'opacity-100 pointer-events-auto border-l-[#FFCC00] shadow-[0_25px_60px_-10px_rgba(0,0,0,0.95),-15px_0_35px_-5px_rgba(255,190,0,0.35)]'
               : 'opacity-0 pointer-events-none shadow-none'
@@ -503,11 +506,12 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
             /* KONDISI 2: STANDARD LOGIN FORM */
             <div className="relative z-10 animate-in fade-in duration-300">
               
-              <div className="text-center mb-6 pt-2">
+              <div className="text-center mb-4 sm:mb-6 pt-1 sm:pt-2">
                 <div className="flex justify-center mb-3.5">
-                  <VaultraLogo variant="icon" size={54} className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]" />
+                  <VaultraLogo variant="icon" size={44} className="sm:hidden drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]" />
+                  <VaultraLogo variant="icon" size={54} className="hidden sm:block drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]" />
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-md">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-md">
                   Welcome Back
                 </h1>
                 <p className="text-xs sm:text-sm text-[#D7C4B0] mt-1.5 font-medium">
