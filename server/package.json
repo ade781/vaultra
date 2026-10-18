@@ -8,7 +8,9 @@
     "test": "node test-api.js",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "build": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -24,7 +26,8 @@
     "dotenv": "^18.0.8",
     "express": "^5.3.0",
     "jsonwebtoken": "^9.0.3",
-    "slugify": "^1.6.9"
+    "slugify": "^1.6.9",
+    "prisma": "^6.19.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.14",

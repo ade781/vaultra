@@ -108,10 +108,13 @@ async function getUsers(req, res, next) {
         username: true,
         name: true,
         role: true,
+        isInitial: true,
+        createdAt: true,
       },
-      orderBy: {
-        username: 'asc',
-      },
+      orderBy: [
+        { role: 'asc' },
+        { username: 'asc' },
+      ],
     });
     return res.json(users);
   } catch (error) {

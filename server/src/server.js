@@ -13,15 +13,31 @@ const errorHandler = require('./middlewares/errorHandler');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enable CORS for frontend Vite client
+// Enable CORS for frontend Vite client (supports 5173, 5174, 5175, 3000, etc.)
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+  'http://localhost:5175',
+  'http://127.0.0.1:5175',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+];
+
 app.use(
   cors({
-    origin: [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (curl, mobile, server-to-server)
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1):(517\d|518\d|3000)$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
   })
 );

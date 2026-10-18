@@ -38,3 +38,6 @@ Thumbs.db
 coverage/
 .turbo/
 .cache/
+
+# Vercel
+.vercel/
