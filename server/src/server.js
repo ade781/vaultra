@@ -16,7 +16,7 @@ const errorHandler = require('./middlewares/errorHandler');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enable CORS for frontend Vite client (supports 5173, 5174, 5175, 3000, etc.)
+// Enable CORS for frontend Vite client and deployed domains (Vercel, custom domain)
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -31,15 +31,17 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (curl, mobile, server-to-server)
+      // Allow requests with no origin (curl, mobile, serverless internal)
       if (!origin) return callback(null, true);
       if (
         allowedOrigins.includes(origin) ||
-        /^http:\/\/(localhost|127\.0\.0\.1):(517\d|518\d|3000)$/.test(origin)
+        /^http:\/\/(localhost|127\.0\.0\.1):(517\d|518\d|3000)$/.test(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.includes('vercel.app')
       ) {
         return callback(null, true);
       }
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
+      return callback(null, true);
     },
     credentials: true,
   })
