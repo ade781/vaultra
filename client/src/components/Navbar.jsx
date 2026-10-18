@@ -1,14 +1,14 @@
-﻿import React from 'react';
-import { Plus, Archive, Menu } from 'lucide-react';
+import React from 'react';
+import { Plus, Menu } from 'lucide-react';
+import VaultraLogo from './VaultraLogo';
 import { getWoodPlank } from '../utils/woodTextures';
 
 export default function Navbar({ onOpenAddModal, onToggleSidebar, totalItems = 0 }) {
   const barWood = getWoodPlank(0);
-  const logoWood = getWoodPlank(7);
-  const btnWood = getWoodPlank(3);
+    const btnWood = getWoodPlank(3);
 
   return (
-    <header className="sticky top-0 z-30 bg-[#FFFFFF]/95 backdrop-blur-md border-b border-[#EBE3D5] transition-all relative">
+    <header className="sticky top-0 z-30 bg-[#FBF5EB]/95 backdrop-blur-md border-b border-[#E5DACB] transition-all relative shadow-xs">
       {/* Bottom Wood Plank Accent Strip */}
       <div 
         className="absolute bottom-0 left-0 right-0 h-1 opacity-80" 
@@ -33,16 +33,7 @@ export default function Navbar({ onOpenAddModal, onToggleSidebar, totalItems = 0
           </button>
 
           <div className="flex items-center gap-2.5">
-            <div 
-              className="w-9 h-9 rounded-xl border border-[#B48248]/60 flex items-center justify-center text-[#FAF8F5] shadow-sm relative overflow-hidden"
-              style={{
-                backgroundImage: `linear-gradient(rgba(35, 20, 12, 0.45), rgba(45, 25, 15, 0.65)), url(${logoWood})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}
-            >
-              <Archive className="w-4.5 h-4.5 stroke-[2.2] text-[#FFE8C2]" />
-            </div>
+            <VaultraLogo variant="icon" size={38} className="drop-shadow-xs" />
             <div className="hidden sm:block">
               <span className="text-base font-extrabold tracking-tight text-[#261C14] block leading-tight">
                 Vaultra
@@ -56,7 +47,7 @@ export default function Navbar({ onOpenAddModal, onToggleSidebar, totalItems = 0
 
         {/* Right Section: Counter & Add Button with Prominent Wood Plank Styling */}
         <div className="flex items-center gap-2.5 sm:gap-3">
-          <div className="flex items-center px-3 py-1 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-xs font-semibold text-[#786858]">
+          <div className="flex items-center px-3 py-1 rounded-xl bg-[#F4E8D7] border border-[#DEC8B0] text-xs font-semibold text-[#664C35]">
             <span className="text-[#8C6239] font-bold mr-1">{totalItems}</span> Tautan
           </div>
 

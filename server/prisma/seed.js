@@ -1,137 +1,95 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const { PrismaClient } = require('@prisma/client');
-const slugify = require('slugify');
+const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting database seeding for Vaultra...');
+  console.log('Seeding Vaultra database with roles (admin & user)...');
 
-  // 1. Create Default Categories
-  const categoriesData = [
-    { name: 'Kuliah & Pendidikan', icon: 'BookOpen', color: '#10b981' },
-    { name: 'Pekerjaan & Karir', icon: 'Briefcase', color: '#3b82f6' },
-    { name: 'Proyek & Coding', icon: 'Code', color: '#8b5cf6' },
-    { name: 'Arsip & Berkas', icon: 'Archive', color: '#f59e0b' },
-    { name: 'Inspirasi & Desain', icon: 'Palette', color: '#ec4899' },
+  const adminPassword = await bcrypt.hash('admin123', 10);
+  const userPassword = await bcrypt.hash('user123', 10);
+  const commonPassword = await bcrypt.hash('password123', 10);
+
+  // 1. Seed Initial Admin (temporary seed admin, auto-deleted when a new admin is registered)
+  await prisma.user.upsert({
+    where: { username: 'admin' },
+    update: {
+      password: adminPassword,
+      name: 'Administrator (Seed)',
+      role: 'admin',
+      isInitial: true,
+    },
+    create: {
+      username: 'admin',
+      password: adminPassword,
+      name: 'Administrator (Seed)',
+      role: 'admin',
+      isInitial: true,
+    },
+  });
+
+  // 2. Seed Default User & Other Sample Users
+  const regularUsers = [
+    { username: 'user', name: 'Pengguna Vaultra', password: userPassword, role: 'user', isInitial: false },
+    { username: 'petugas', name: 'Petugas Vaultra', password: commonPassword, role: 'user', isInitial: false },
+    { username: 'budi', name: 'Budi Santoso', password: commonPassword, role: 'user', isInitial: false },
+    { username: 'siti', name: 'Siti Rahma', password: commonPassword, role: 'user', isInitial: false },
+    { username: 'adit', name: 'Aditya Pratama', password: commonPassword, role: 'user', isInitial: false },
   ];
 
-  const createdCategories = [];
-  for (const cat of categoriesData) {
-    const slug = slugify(cat.name, { lower: true, strict: true });
-    const category = await prisma.category.upsert({
-      where: { name: cat.name },
-      update: {},
-      create: {
-        name: cat.name,
-        slug,
-        icon: cat.icon,
-        color: cat.color,
-      },
+  for (const u of regularUsers) {
+    await prisma.user.upsert({
+      where: { username: u.username },
+      update: { password: u.password, name: u.name, role: u.role, isInitial: false },
+      create: u,
     });
-    createdCategories.push(category);
   }
-  console.log(`✅ Seeded ${createdCategories.length} categories.`);
+  console.log('Seeded initial admin and users successfully.');
 
-  // 2. Create Default Tags
-  const tagNames = ['skripsi', 'penting', 'referensi', 'template', 'draft', 'final', '2026'];
-  const createdTags = [];
-  for (const name of tagNames) {
-    const tag = await prisma.tag.upsert({
-      where: { name },
-      update: {},
-      create: { name },
-    });
-    createdTags.push(tag);
-  }
-  console.log(`✅ Seeded ${createdTags.length} tags.`);
-
-  // 3. Create Sample Items if table is empty
-  const itemCount = await prisma.item.count();
-  if (itemCount === 0) {
-    const catKuliah = createdCategories.find(c => c.name.includes('Kuliah'));
-    const catKerja = createdCategories.find(c => c.name.includes('Pekerjaan'));
-    const catProyek = createdCategories.find(c => c.name.includes('Proyek'));
-
-    const sampleItems = [
+  // 3. Seed Items if empty
+  const count = await prisma.item.count();
+  if (count === 0) {
+    const initialItems = [
       {
-        title: 'Folder Bahan Kuliah Semester Akhir',
-        url: 'https://drive.google.com/drive/folders/1aBcDeFgHiJkLmNoPqRsTuVwXyZ_Folder',
-        description: 'Kumpulan materi kuliah, slide perkuliahan, dan jurnal pendukung.',
-        itemType: 'GDRIVE',
-        driveType: 'FOLDER',
-        categoryId: catKuliah?.id,
-        tags: ['kuliah', 'referensi'],
+        title: 'Folder Google Drive Bahan Skripsi 2026',
+        url: 'https://drive.google.com/drive/folders/1ABC_BahanSkripsi2026_Sample',
+        creator: 'Budi Santoso',
+        sourceEmail: 'budi@kampus.ac.id',
+        isPrivate: false,
+        sharedWith: null,
       },
       {
-        title: 'Laporan Tugas Akhir / Skripsi 2026',
-        url: 'https://docs.google.com/document/d/1XyZ_DocSampleId12345/edit',
-        description: 'Draft naskah lengkap dari Bab 1 hingga Bab 5 berserta lampiran.',
-        itemType: 'GDRIVE',
-        driveType: 'DOC',
-        categoryId: catKuliah?.id,
-        tags: ['skripsi', 'final', 'penting'],
+        title: 'Master Data Penjualan & Keuangan Q1',
+        url: 'https://docs.google.com/spreadsheets/d/1XYZ_DataKeuangan2026_Sample/edit',
+        creator: 'Administrator',
+        sourceEmail: 'admin@vaultra.local',
+        isPrivate: true,
+        sharedWith: 'petugas',
       },
       {
-        title: 'Master Spreadsheet Rencana Kerja & Anggaran',
-        url: 'https://docs.google.com/spreadsheets/d/1XyZ_SheetSampleId67890/edit',
-        description: 'Tabel perhitungan RAB proyek, timeline mingguan, dan KPI bulanan.',
-        itemType: 'GDRIVE',
-        driveType: 'SHEET',
-        categoryId: catKerja?.id,
-        tags: ['penting', 'template'],
-      },
-      {
-        title: 'Pitch Deck & Presentasi Desain Vaultra',
-        url: 'https://docs.google.com/presentation/d/1XyZ_SlideSampleId54321/edit',
-        description: 'Slide visual presentasi arsitektur sistem dan konsep UI/UX.',
-        itemType: 'GDRIVE',
-        driveType: 'SLIDE',
-        categoryId: catProyek?.id,
-        tags: ['template', 'final'],
-      },
-      {
-        title: 'Backup Aset Grafis & Dataset.zip',
-        url: 'https://drive.google.com/file/d/1XyZ_ArchiveSampleId99999/view',
-        description: 'Arsip terkompresi berisi gambar ikon, mockups, dan dataset survey.',
-        itemType: 'GDRIVE',
-        driveType: 'ARCHIVE',
-        categoryId: catProyek?.id,
-        tags: ['referensi'],
+        title: 'Slide Presentasi Pitch Deck Investor',
+        url: 'https://docs.google.com/presentation/d/1XYZ_PitchDeck2026_Sample/edit',
+        creator: 'Aditya Pratama',
+        sourceEmail: 'adit@startup.id',
+        isPrivate: false,
+        sharedWith: null,
       },
     ];
 
-    for (const item of sampleItems) {
-      const itemTags = item.tags.map(tName => ({
-        tag: {
-          connect: { name: tName },
-        },
-      }));
-
-      await prisma.item.create({
-        data: {
-          title: item.title,
-          url: item.url,
-          description: item.description,
-          itemType: item.itemType,
-          driveType: item.driveType,
-          categoryId: item.categoryId,
-          tags: {
-            create: itemTags,
-          },
-        },
-      });
+    for (const item of initialItems) {
+      await prisma.item.create({ data: item });
     }
-    console.log(`✅ Seeded ${sampleItems.length} sample items.`);
-  } else {
-    console.log(`ℹ️ Items table already has ${itemCount} items, skipping item seed.`);
+    console.log(`Seeded ${initialItems.length} initial items.`);
   }
 
-  console.log('✨ Seeding completed successfully!');
+  console.log('Seeding finished successfully.');
 }
 
 main()
-  .catch(e => {
-    console.error('❌ Error during seeding:', e);
+  .catch((e) => {
+    console.error('Seeding error:', e);
     process.exit(1);
   })
   .finally(async () => {

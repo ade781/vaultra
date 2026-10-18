@@ -1,15 +1,11 @@
-import React from 'react';
 import { 
   Folder, 
   FileText, 
-  Table, 
   Presentation, 
   FileSpreadsheet, 
   Archive, 
   HardDrive, 
-  FileQuestion,
-  ExternalLink,
-  Link as LinkIcon
+  FileQuestion 
 } from 'lucide-react';
 
 /**

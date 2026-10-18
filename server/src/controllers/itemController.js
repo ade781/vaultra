@@ -1,4 +1,20 @@
 const prisma = require('../prisma');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'vaultra_jwt_secret_wood_key_2026';
+
+function getAuthenticatedUser(req) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      return jwt.verify(token, JWT_SECRET);
+    }
+  } catch {
+    // Ignore invalid token
+  }
+  return null;
+}
 
 async function getItems(req, res, next) {
   try {
@@ -43,11 +59,26 @@ async function createItem(req, res, next) {
       return res.status(400).json({ error: 'Link URL wajib diisi' });
     }
 
+    const authUser = getAuthenticatedUser(req);
+    let finalCreator = 'Anonim';
+
+    if (authUser) {
+      // Jika user sudah login, otomatis isi dengan nama atau username akun yang login
+      const dbUser = await prisma.user.findUnique({ where: { id: authUser.id } });
+      finalCreator = (dbUser && (dbUser.name || dbUser.username)) || authUser.name || authUser.username || 'Pengguna';
+    } else {
+      // Jika user BELUM login, dia WAJIB mengisi nama pembuat
+      if (!creator || typeof creator !== 'string' || !creator.trim() || creator.trim().toLowerCase() === 'anonim') {
+        return res.status(400).json({ error: 'Nama pembuat wajib diisi karena Anda belum login' });
+      }
+      finalCreator = creator.trim();
+    }
+
     const item = await prisma.item.create({
       data: {
         title: title.trim(),
         url: url.trim(),
-        creator: creator && typeof creator === 'string' && creator.trim() ? creator.trim() : 'Anonim',
+        creator: finalCreator,
         sourceEmail: sourceEmail && typeof sourceEmail === 'string' && sourceEmail.trim() ? sourceEmail.trim() : null,
         isPrivate: Boolean(isPrivate),
         sharedWith: isPrivate && sharedWith && typeof sharedWith === 'string' && sharedWith.trim() ? sharedWith.trim() : null,
@@ -77,12 +108,32 @@ async function updateItem(req, res, next) {
       return res.status(400).json({ error: 'Link URL wajib diisi' });
     }
 
+    const existingItem = await prisma.item.findUnique({ where: { id } });
+    if (!existingItem) {
+      return res.status(404).json({ error: 'Link tidak ditemukan' });
+    }
+
+    const authUser = getAuthenticatedUser(req);
+    let finalCreator = existingItem.creator;
+
+    if (authUser) {
+      if (creator && typeof creator === 'string' && creator.trim()) {
+        finalCreator = creator.trim();
+      }
+    } else {
+      if (creator && typeof creator === 'string' && creator.trim()) {
+        finalCreator = creator.trim();
+      } else if (!finalCreator || finalCreator === 'Anonim') {
+        return res.status(400).json({ error: 'Nama pembuat wajib diisi' });
+      }
+    }
+
     const item = await prisma.item.update({
       where: { id },
       data: {
         title: title.trim(),
         url: url.trim(),
-        creator: creator && typeof creator === 'string' && creator.trim() ? creator.trim() : 'Anonim',
+        creator: finalCreator,
         sourceEmail: sourceEmail && typeof sourceEmail === 'string' && sourceEmail.trim() ? sourceEmail.trim() : null,
         isPrivate: Boolean(isPrivate),
         sharedWith: isPrivate && sharedWith && typeof sharedWith === 'string' && sharedWith.trim() ? sharedWith.trim() : null,

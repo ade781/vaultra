@@ -1,5 +1,6 @@
-﻿import React from 'react';
-import { Archive, LogIn, LogOut, ShieldCheck, FolderLock } from 'lucide-react';
+import React from 'react';
+import { LogIn, LogOut, ShieldCheck, FolderLock } from 'lucide-react';
+import VaultraLogo from './VaultraLogo';
 import { getWoodPlank } from '../utils/woodTextures';
 
 export default function Sidebar({
@@ -25,7 +26,7 @@ export default function Sidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed md:sticky top-0 left-0 z-40 h-[100dvh] w-64 bg-[#FDFBF7]/90 backdrop-blur-md border-r border-[#EBE3D5] flex flex-col justify-between transition-transform duration-200 ease-in-out ${
+        className={`fixed md:sticky top-0 left-0 z-40 h-[100dvh] w-64 bg-[#FBF5EB]/95 backdrop-blur-md border-r border-[#E5DACB] flex flex-col justify-between transition-transform duration-200 ease-in-out ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
@@ -40,9 +41,7 @@ export default function Sidebar({
             }}
           >
             <div className="flex items-center gap-3 relative z-10">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#8C6239] to-[#3D271D] text-[#FAF8F5] flex items-center justify-center shadow-md shadow-black/40 border border-[#B48248]/70">
-                <Archive className="w-5 h-5 stroke-[2.2]" />
-              </div>
+              <VaultraLogo variant="icon" size={42} className="drop-shadow-md" />
               <div>
                 <span className="text-lg font-extrabold tracking-tight text-[#FAF8F5] block leading-none drop-shadow-sm">
                   Vaultra
@@ -79,11 +78,11 @@ export default function Sidebar({
         </div>
 
         {/* Bottom Section: Login Button / User Profile */}
-        <div className="p-4 border-t border-[#EFE8DE] bg-[#FAF8F5]">
+        <div className="p-4 border-t border-[#E5DACB] bg-[#F5EADB]">
           {user ? (
             /* Logged In State */
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#FFFFFF] border border-[#E5DACB] shadow-xs">
+              <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#FAF4ED] border border-[#DEC8B0] shadow-xs">
                 <div className="w-8 h-8 rounded-lg bg-[#8C6239] text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs">
                   {user.username ? user.username.slice(0, 2) : 'US'}
                 </div>

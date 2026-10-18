@@ -1,7 +1,11 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import VaultraLogo from './VaultraLogo';
+import PullCord from './PullCord';
 import * as api from '../services/api';
 import { getWoodPlank } from '../utils/woodTextures';
+import woodPlank6 from '../assets/wood-plank-6.jpg';
+import woodPlank2 from '../assets/wood-plank-2.jpg';
 
 function playSwitchSound(isOn) {
   try {
@@ -38,18 +42,14 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
   const [error, setError] = useState('');
 
   // Interactive Lamp State (True by default)
-  const [isLampOn, setIsLampOn] = useState(true);
-  const [isPullingCord, setIsPullingCord] = useState(false);
+  const [isLampOn, setIsLampOn] = useState(false);
 
   const toggleLamp = () => {
-    setIsPullingCord(true);
-    const nextState = !isLampOn;
-    playSwitchSound(nextState);
-
-    setTimeout(() => {
-      setIsLampOn(nextState);
-      setIsPullingCord(false);
-    }, 160);
+    setIsLampOn((prev) => {
+      const next = !prev;
+      playSwitchSound(next);
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -100,34 +100,50 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
   return (
     <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-8 relative overflow-hidden select-none">
       
-      {/* 1. Blurred Bright Wood Plank Background for Login Page (Kayu Cerah: wood-plank-7) */}
+      {/* Top Left: Quick Back Navigation */}
+      <div className="absolute top-5 left-5 z-40">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-[#D7C4B0] hover:text-[#FAF8F5] bg-[#140C07]/80 hover:bg-[#140C07] border border-[#4A2E1B]/70 shadow-md transition-all cursor-pointer backdrop-blur-sm"
+          title="Kembali ke Beranda"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 text-[#B48248]" />
+          <span>Kembali</span>
+        </button>
+      </div>
+      
+      {/* 1. Wood Plank 6 Background for Login Page - Lebih Gelap & Berkarakter */}
       <div 
         className="absolute inset-0 pointer-events-none z-0 transition-all duration-700"
         style={{
-          backgroundImage: `url(${getWoodPlank(7)})`,
+          backgroundImage: `url(${woodPlank6})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           filter: isLampOn 
-            ? 'blur(16px) brightness(1.15) saturate(1.1)' 
-            : 'blur(16px) brightness(0.18) saturate(0.5)',
-          transform: 'scale(1.08)',
+            ? 'blur(4px) brightness(0.65) saturate(1.2)' 
+            : 'blur(4px) brightness(0.10) saturate(0.4)',
+          transform: 'scale(1.03)',
         }}
       />
 
-      {/* 2. Ambient Lighting Glow radiating from the lamp over the wooden wall */}
+      {/* 2. Ambient Intense Golden-Yellow Glow Radiating from the Lamp */}
       <div 
         className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
-          isLampOn ? 'opacity-100' : 'opacity-0'
+          isLampOn ? 'opacity-65' : 'opacity-0'
         }`}
         style={{
-          background: 'radial-gradient(circle at 28% 42%, rgba(255, 225, 120, 0.45) 0%, rgba(240, 175, 65, 0.28) 38%, rgba(180, 120, 40, 0.16) 68%, rgba(40, 25, 12, 0.35) 100%)',
+          background: 'radial-gradient(circle at 26% 40%, rgba(255, 204, 0, 0.55) 0%, rgba(255, 160, 10, 0.32) 38%, rgba(180, 100, 20, 0.15) 65%, transparent 100%)',
         }}
       />
 
-      {/* 3. Dark Shadow Overlay when Lamp is OFF */}
+      {/* 3. Deep Cinematic Room Vignette (Lebih Gelap di Tepian) */}
+      <div className="absolute inset-0 pointer-events-none z-0 bg-gradient-to-b from-black/70 via-transparent to-black/80" />
+
+      {/* 4. Dark Shadow Overlay when Lamp is OFF */}
       <div 
         className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
-          isLampOn ? 'opacity-0' : 'opacity-92 bg-[#090705]'
+          isLampOn ? 'opacity-0' : 'opacity-95 bg-[#060403]'
         }`}
       />
 
@@ -164,7 +180,7 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
             }`}
             style={{
               clipPath: 'polygon(33% 0%, 67% 0%, 100% 100%, 0% 100%)',
-              background: 'linear-gradient(180deg, rgba(255, 240, 160, 0.72) 0%, rgba(255, 205, 80, 0.42) 35%, rgba(230, 160, 45, 0.18) 75%, transparent 100%)',
+              background: 'linear-gradient(180deg, rgba(255, 235, 70, 0.88) 0%, rgba(255, 195, 25, 0.58) 35%, rgba(240, 140, 10, 0.25) 75%, transparent 100%)',
             }}
           />
 
@@ -199,34 +215,13 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                 onClick={toggleLamp}
                 className={`w-36 sm:w-44 h-5 sm:h-6 rounded-full transition-all duration-500 cursor-pointer -mt-2.5 relative z-20 ${
                   isLampOn
-                    ? 'bg-[#FFFBE8] shadow-[0_0_20px_6px_#FFE58F,0_0_55px_20px_rgba(255,195,65,0.85),0_0_90px_35px_rgba(255,150,20,0.4)] border border-[#FFF4CC]'
+                    ? 'bg-gradient-to-r from-[#FFCC00] via-[#FFF3B0] to-[#FFB703] shadow-[0_0_25px_8px_#FFCC00,0_0_65px_25px_rgba(255,185,10,0.9),0_0_110px_45px_rgba(255,140,0,0.5)] border border-[#FFE885]'
                     : 'bg-[#1C1712] shadow-[inset_0_3px_6px_rgba(0,0,0,0.9)] opacity-85 border border-[#2D241C]'
                 }`}
               />
 
-              {/* Interactive Pull String (Tali Saklar Gantung dengan Kayu Akor di Kanan) */}
-              <div 
-                onClick={toggleLamp}
-                className="absolute top-18 sm:top-22 right-4 sm:right-5 cursor-pointer group flex flex-col items-center z-30"
-                title="Tarik tali untuk menyalakan/mematikan lampu"
-              >
-                <div 
-                  className={`w-[1.5px] bg-[#2E2822] shadow-[1px_1px_2px_rgba(0,0,0,0.8)] transition-all duration-150 origin-top ${
-                    isPullingCord ? 'h-18 sm:h-22' : 'h-14 sm:h-16'
-                  }`}
-                />
-                <div 
-                  className={`w-3.5 h-6.5 rounded-full border transition-all duration-150 transform group-hover:scale-110 active:scale-95 shadow-[2px_6px_14px_rgba(0,0,0,0.85),inset_1px_1px_2px_rgba(255,255,255,0.4),inset_-1px_-1px_3px_rgba(0,0,0,0.6)] ${
-                    isPullingCord ? 'translate-y-2' : 'translate-y-0'
-                  } ${
-                    isLampOn 
-                      ? 'bg-gradient-to-b from-[#E2B77E] via-[#C9965B] to-[#8C5824] border-[#FFE2A8]/70 text-white shadow-[#C9965B]/30' 
-                      : 'bg-gradient-to-b from-[#5C422A] to-[#302114] border-[#7D5A38]/50 text-white/50'
-                  }`}
-                >
-                  <div className="w-1 h-3 mx-auto mt-1 rounded-full bg-white/35" />
-                </div>
-              </div>
+              {/* Interactive Physics Spring Pull Cord (Bisa Ditarik, Menjepret & Bergelantungan) */}
+              <PullCord isLampOn={isLampOn} onToggle={toggleLamp} />
             </div>
 
             {/* 2. MIDDLE: Vertical Lamp Rod / Tiang Lampu Hitam (Tersambung langsung ke alas kaki) */}
@@ -251,7 +246,7 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
 
             {/* 5. Floor Light Reflection Puddle (Pendaran cahaya lantai di sekeliling kaki lampu) */}
             {isLampOn && (
-              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-72 sm:w-84 h-12 rounded-[100%] bg-gradient-to-r from-transparent via-[#FFC843]/25 to-transparent blur-xl pointer-events-none z-0" />
+              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-72 sm:w-84 h-12 rounded-[100%] bg-gradient-to-r from-transparent via-[#FFB703]/50 to-transparent blur-2xl pointer-events-none z-0" />
             )}
 
           </div>
@@ -259,49 +254,64 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
         </div>
 
         {/* ======================================================== */}
-        {/* SEBELAH KANAN: Floating Login Card dengan Deep Shadow     */}
+        {/* SEBELAH KANAN: Floating Login Card Muncul Saat Lampu ON  */}
         {/* ======================================================== */}
         <div 
-          className={`w-full max-w-[420px] rounded-3xl p-7 sm:p-9 transition-all duration-700 relative overflow-hidden backdrop-blur-xl ${
+          className={`w-full max-w-[430px] rounded-3xl p-7 sm:p-9 transition-all duration-700 ease-out relative overflow-hidden backdrop-blur-xl border ${
             isLampOn
-              ? 'bg-[#1C1A17]/90 border border-[#3A332A] border-l-[#FFCC00]/30 shadow-[20px_25px_60px_-10px_rgba(0,0,0,0.9),0_10px_25px_rgba(0,0,0,0.8)]'
-              : 'bg-[#14120F]/95 border border-[#262018] shadow-[20px_25px_60px_-10px_rgba(0,0,0,0.95)] opacity-85'
+              ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto border-[#B48248]/60 border-l-[#FFCC00] shadow-[0_25px_60px_-10px_rgba(0,0,0,0.95),-15px_0_35px_-5px_rgba(255,190,0,0.35)]'
+              : 'opacity-0 scale-95 translate-y-8 pointer-events-none border-transparent shadow-none'
           }`}
+          style={{
+            backgroundImage: `linear-gradient(145deg, rgba(30, 17, 10, 0.88) 0%, rgba(18, 10, 6, 0.94) 100%), url(${woodPlank2})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
         >
-          {/* Subtle Top Wooden Trim Line for Vaultra Craft Identity */}
+          {/* Top Wooden Plank Header Moulding */}
           <div 
-            className="absolute top-0 left-0 right-0 h-1.5 opacity-85" 
+            className="absolute top-0 left-0 right-0 h-3 border-b border-[#D4A373]/30 shadow-xs" 
             style={{ 
-              backgroundImage: `url(${getWoodPlank(5)})`, 
+              backgroundImage: `linear-gradient(rgba(45, 26, 14, 0.5), rgba(30, 16, 9, 0.7)), url(${woodPlank2})`, 
               backgroundSize: "cover", 
               backgroundPosition: "center" 
             }} 
           />
 
-          {/* Card Header: Welcome Back */}
-          <div className="text-center mb-6 pt-1">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#FAF8F5] drop-shadow-sm">
+          {/* Inner Brass Inlay Ring & Corner Screws */}
+          <div className="absolute inset-2.5 border border-[#D4A373]/25 rounded-2xl pointer-events-none" />
+          <div className="absolute top-4 left-4 w-1.5 h-1.5 rounded-full bg-[#FFE2A8] shadow-[0_1px_2px_rgba(0,0,0,0.9)] pointer-events-none" />
+          <div className="absolute top-4 right-4 w-1.5 h-1.5 rounded-full bg-[#FFE2A8] shadow-[0_1px_2px_rgba(0,0,0,0.9)] pointer-events-none" />
+          <div className="absolute bottom-4 left-4 w-1.5 h-1.5 rounded-full bg-[#FFE2A8] shadow-[0_1px_2px_rgba(0,0,0,0.9)] pointer-events-none" />
+          <div className="absolute bottom-4 right-4 w-1.5 h-1.5 rounded-full bg-[#FFE2A8] shadow-[0_1px_2px_rgba(0,0,0,0.9)] pointer-events-none" />
+
+          {/* Card Header: Welcome Back with Logo */}
+          <div className="text-center mb-6 pt-2 relative z-10">
+            <div className="flex justify-center mb-3.5">
+              <VaultraLogo variant="icon" size={54} className="drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-md">
               Welcome Back
             </h1>
-            <p className="text-xs sm:text-sm text-[#9E9282] mt-1.5">
-              Enter your details to access your account
+            <p className="text-xs sm:text-sm text-[#D7C4B0] mt-1.5 font-medium">
+              Akses brankas tautan pribadi Anda
             </p>
           </div>
 
           {/* Error Notice */}
           {error && (
-            <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-300 text-xs shadow-inner">
+            <div className="flex items-center gap-2 p-3 mb-4 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-200 text-xs shadow-inner relative z-10">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
             
             {/* Username Field */}
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#7D7365]">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#B48248]">
                 <User className="w-4 h-4" />
               </div>
               <input
@@ -310,13 +320,13 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Username"
-                className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#14120F] border border-[#2C2720] text-sm text-[#FAF8F5] placeholder-[#665D50] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]"
+                className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
               />
             </div>
 
             {/* Password Field */}
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#7D7365]">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-[#B48248]">
                 <Lock className="w-4 h-4" />
               </div>
               <input
@@ -325,25 +335,25 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                className="w-full pl-11 pr-11 py-3 rounded-2xl bg-[#14120F] border border-[#2C2720] text-sm text-[#FAF8F5] placeholder-[#665D50] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]"
+                className="w-full pl-11 pr-11 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#7D7365] hover:text-[#FAF8F5] cursor-pointer"
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#9E826A] hover:text-[#FAF8F5] cursor-pointer"
                 aria-label="Lihat password"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
 
-            {/* Primary Action Button: Vibrant Gold/Yellow Sign In */}
+            {/* Primary Action Button: Glowing Yellow / Amber Woodcraft Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 mt-2 rounded-2xl text-sm font-bold text-[#14120F] bg-[#FFCC00] hover:bg-[#FFD633] active:bg-[#E6B800] shadow-[0_8px_20px_rgba(255,204,0,0.3)] hover:shadow-[0_12px_28px_rgba(255,204,0,0.45)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 px-4 mt-2 rounded-2xl text-sm font-black text-[#1C1008] bg-gradient-to-r from-[#FFCC00] via-[#FFD633] to-[#FFAA00] hover:brightness-110 active:brightness-95 border border-[#FFE2A8]/70 shadow-[0_8px_25px_rgba(255,204,0,0.4)] hover:shadow-[0_12px_32px_rgba(255,204,0,0.55)] hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 cursor-pointer disabled:opacity-50 tracking-wide"
             >
-              {loading ? 'Signing In...' : 'Sign In'}
+              {loading ? 'Memproses Masuk...' : 'Sign In'}
             </button>
 
             {/* Kembali Button to Dashboard */}
@@ -351,14 +361,74 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
               type="button"
               onClick={onBack}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs font-semibold text-[#9E9282] hover:text-[#FAF8F5] bg-transparent hover:bg-white/5 border border-white/5 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs font-semibold text-[#D7C4B0] hover:text-[#FAF8F5] bg-[#140C07]/60 hover:bg-[#140C07] border border-[#4A2E1B]/60 transition-all cursor-pointer"
             >
-              <ArrowLeft className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-3.5 h-3.5 text-[#B48248]" />
               <span>Kembali ke Beranda</span>
             </button>
 
+            {/* Hallmark Signature: MADE BY ADE7 (SVG) */}
+            <div className="pt-2 flex justify-center items-center">
+              <svg 
+                viewBox="0 0 220 32" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg" 
+                className="w-48 sm:w-52 h-auto opacity-75 hover:opacity-100 transition-opacity drop-shadow-sm select-none"
+                aria-label="Made By Ade7"
+              >
+                <defs>
+                  <linearGradient id="ade7Gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FFE5B4" />
+                    <stop offset="50%" stopColor="#E5B57A" />
+                    <stop offset="100%" stopColor="#FFCC00" />
+                  </linearGradient>
+                  <linearGradient id="ade7Line" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#B48248" stopOpacity="0" />
+                    <stop offset="50%" stopColor="#FFCC00" stopOpacity="0.85" />
+                    <stop offset="100%" stopColor="#B48248" stopOpacity="0" />
+                  </linearGradient>
+                  <filter id="ade7Glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#FFCC00" floodOpacity="0.45" />
+                  </filter>
+                </defs>
+
+                {/* Left Accent Wing */}
+                <line x1="10" y1="16" x2="48" y2="16" stroke="url(#ade7Line)" strokeWidth="1.2" strokeLinecap="round" />
+                <polygon points="53,16 56,13 59,16 56,19" fill="#FFCC00" opacity="0.9" />
+
+                {/* Centered Typography: MADE BY ADE7 */}
+                <g filter="url(#ade7Glow)">
+                  <text 
+                    x="110" 
+                    y="20" 
+                    fontFamily="system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif" 
+                    fontSize="10.5" 
+                    fontWeight="800" 
+                    letterSpacing="3.2" 
+                    textAnchor="middle" 
+                    fill="url(#ade7Gold)"
+                  >
+                    MADE BY ADE7
+                  </text>
+                </g>
+
+                {/* Right Accent Wing */}
+                <polygon points="161,16 164,13 167,16 164,19" fill="#FFCC00" opacity="0.9" />
+                <line x1="172" y1="16" x2="210" y2="16" stroke="url(#ade7Line)" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            </div>
+
           </form>
 
+          {/* Bottom Wood Plank Accent Line */}
+          <div 
+            className="absolute bottom-0 left-0 right-0 h-2 opacity-75" 
+            style={{ 
+              backgroundImage: `url(${woodPlank2})`, 
+              backgroundSize: "cover", 
+              backgroundPosition: "center" 
+            }} 
+          />
         </div>
 
       </div>

@@ -12,6 +12,8 @@ model User {
   username  String   @unique
   password  String
   name      String?
+  role      String   @default("user")
+  isInitial Boolean  @default(false)
   createdAt DateTime @default(now())
 }
 

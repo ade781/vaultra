@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
@@ -8,8 +8,10 @@ import ItemDetailModal from './components/ItemDetailModal';
 import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
 import * as api from './services/api';
-import { Filter, Globe, Lock, Archive } from 'lucide-react';
+import { Globe, Lock } from 'lucide-react';
 import { getWoodPlank } from './utils/woodTextures';
+import woodPlank4 from './assets/wood-plank-4.jpg';
+import woodPlank1 from './assets/wood-plank-1.jpg';
 
 export default function App() {
   // Navigation View: 'dashboard' | 'login'
@@ -145,19 +147,19 @@ export default function App() {
   // Dashboard View (Main Page with Sidebar on Left)
   return (
     <div className="min-h-[100dvh] flex text-[#261C14] relative overflow-x-hidden">
-      {/* 1. Blurred Bright Wood Plank Background for Main Dashboard (Kayu Cerah: wood-plank-4) */}
+      {/* 1. Wood Plank 4 Background for Main Dashboard (Kayu Cerah: wood-plank-4.jpg) */}
       <div 
         className="fixed inset-0 pointer-events-none z-0"
         style={{
-          backgroundImage: `url(${getWoodPlank(4)})`,
+          backgroundImage: `url(${woodPlank4})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          filter: 'blur(16px) brightness(1.08)',
-          transform: 'scale(1.08)',
+          filter: 'blur(5px) brightness(1.04)',
+          transform: 'scale(1.03)',
         }}
       />
       {/* Soft Light Overlay to keep dashboard luminous, crisp & readable */}
-      <div className="fixed inset-0 pointer-events-none z-0 bg-[#FAF7F2]/82 backdrop-brightness-105" />
+      <div className="fixed inset-0 pointer-events-none z-0 bg-[#FAF7F2]/75" />
 
       {/* 2. Left Sidebar (Semi-transparent floating over the blurred wood) */}
       <Sidebar
@@ -182,67 +184,35 @@ export default function App() {
 
         {/* Content Area */}
         <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          
-          {/* 1. Prominent Wood Plank Showcase Banner (Aksen Kayu Nyata Utama) */}
+          {/* Kontainer Kayu Memanjang: Judul 'Tautan' di Kiri, Filter di Kanan */}
           <div 
-            className="relative rounded-3xl p-6 sm:p-7 overflow-hidden border border-[#52331B]/40 shadow-lg mb-6"
+            className="w-full rounded-2xl px-5 sm:px-6 py-3.5 mb-6 shadow-md border border-[#4A2E1B]/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 relative overflow-hidden"
             style={{
-              backgroundImage: `linear-gradient(135deg, rgba(38, 22, 13, 0.82) 0%, rgba(54, 32, 18, 0.88) 100%), url(${getWoodPlank(0)})`,
+              backgroundImage: `linear-gradient(rgba(36, 20, 12, 0.72), rgba(46, 26, 14, 0.85)), url(${woodPlank1})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
             }}
           >
-            {/* Ambient Lighting & Inlay Border */}
-            <div className="absolute inset-0 border border-[#D4A373]/30 rounded-3xl pointer-events-none" />
+            {/* Subtle Brass Inlay Border */}
+            <div className="absolute inset-0 border border-[#D4A373]/35 rounded-2xl pointer-events-none" />
 
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1C1008]/75 border border-[#B48248]/50 text-[#FCEBD4] text-[11px] font-bold uppercase tracking-wider mb-2.5 shadow-sm">
-                  <Archive className="w-3.5 h-3.5 text-[#FFCC00]" />
-                  <span>Brankas Tautan Digital Beraksen Kayu Alami</span>
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-md">
-                  Koleksi Tautan Brankas
-                </h1>
-                <p className="text-xs sm:text-sm text-[#D7C4B0] mt-1 max-w-xl leading-relaxed">
-                  Penyimpanan tautan terorganisir dengan kendali privasi publik dan privat, dibalut sentuhan hangat tekstur kayu alami.
-                </p>
-              </div>
-
-              {/* Quick Counter Badges on Wooden Plaque */}
-              <div className="flex items-center gap-2.5 self-start md:self-auto shrink-0">
-                <div className="px-4 py-2 rounded-2xl bg-[#1C1008]/85 border border-[#B48248]/40 text-center shadow-md">
-                  <span className="block text-[10px] font-bold tracking-wider uppercase text-[#BFA895]">Total</span>
-                  <span className="block text-base font-extrabold text-[#FAF8F5]">{items.length}</span>
-                </div>
-                <div className="px-4 py-2 rounded-2xl bg-[#1C1008]/85 border border-[#7CB364]/40 text-center shadow-md">
-                  <span className="block text-[10px] font-bold tracking-wider uppercase text-[#9EE37D]">Publik</span>
-                  <span className="block text-base font-extrabold text-[#D7F2CB]">{items.filter((i) => !i.isPrivate).length}</span>
-                </div>
-                <div className="px-4 py-2 rounded-2xl bg-[#1C1008]/85 border border-[#D4A373]/40 text-center shadow-md">
-                  <span className="block text-[10px] font-bold tracking-wider uppercase text-[#FFCC00]">Private</span>
-                  <span className="block text-base font-extrabold text-[#FCE3C3]">{items.filter((i) => i.isPrivate).length}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Filter Bar with Wooden Button Accents */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 pb-4 border-b border-[#EBE3D5]">
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#786858]">
-              <Filter className="w-3.5 h-3.5 text-[#8C6239]" />
-              <span>Saring Tampilan Koleksi:</span>
+            {/* Sebelah Kiri: Judul Tautan Minimalis */}
+            <div className="flex items-center gap-2.5 relative z-10">
+              <div className="w-2 h-2 rounded-full bg-[#FFDF80] shadow-[0_0_6px_rgba(255,223,128,0.8)]" />
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-sm">
+                Tautan
+              </h1>
             </div>
 
-            {/* Filter Tabs with Wood Button Styling */}
-            <div className="inline-flex items-center p-1 rounded-xl bg-[#F0EAE1] border border-[#E5DACB] text-xs font-semibold self-start sm:self-auto">
+            {/* Sebelah Kanan: Filter Tabs Terintegrasi Bergaya Kayu & Kuningan */}
+            <div className="inline-flex items-center p-1 rounded-xl bg-[#1C1008]/80 border border-[#B48248]/40 text-xs font-semibold self-start sm:self-auto relative z-10 shadow-inner">
               <button
                 type="button"
                 onClick={() => setFilterType('all')}
                 className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                   filterType === 'all'
-                    ? 'bg-[#FFFFFF] text-[#8C6239] shadow-xs'
-                    : 'text-[#786858] hover:text-[#261C14]'
+                    ? 'bg-[#E5B57A] text-[#24140B] font-bold shadow-sm'
+                    : 'text-[#D7C4B0] hover:text-[#FAF8F5]'
                 }`}
               >
                 Semua ({items.length})
@@ -250,10 +220,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setFilterType('public')}
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                   filterType === 'public'
-                    ? 'bg-[#FFFFFF] text-[#4A6B3D] shadow-xs'
-                    : 'text-[#786858] hover:text-[#261C14]'
+                    ? 'bg-[#7CB364] text-[#14260D] font-bold shadow-sm'
+                    : 'text-[#D7C4B0] hover:text-[#FAF8F5]'
                 }`}
               >
                 <Globe className="w-3 h-3" />
@@ -262,16 +232,17 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setFilterType('private')}
-                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                   filterType === 'private'
-                    ? 'bg-[#FFFFFF] text-[#8C6239] shadow-xs'
-                    : 'text-[#786858] hover:text-[#261C14]'
+                    ? 'bg-[#FFCC00] text-[#26160D] font-bold shadow-sm'
+                    : 'text-[#D7C4B0] hover:text-[#FAF8F5]'
                 }`}
               >
                 <Lock className="w-3 h-3" />
                 <span>Private ({items.filter((i) => i.isPrivate).length})</span>
               </button>
             </div>
+
           </div>
 
           {/* Error Alert */}
@@ -327,10 +298,21 @@ export default function App() {
 
         </main>
 
-        {/* Footer */}
-        <footer className="border-t border-[#EBE3D5] bg-[#FFFFFF] py-6 text-center text-xs text-[#9E8C7C] mt-auto">
+        {/* Footer / Bottom Bar - Lebih Kuning Hangat seperti Kayu & Teks Bersih */}
+        <footer className="border-t border-[#E5DACB] bg-[#FBF5EB]/95 py-6 text-center text-xs text-[#8C7460] mt-auto relative shadow-inner">
+          {/* Subtle Top Wood Accent Strip on Bottom Bar */}
+          <div 
+            className="absolute top-0 left-0 right-0 h-0.5 opacity-70"
+            style={{
+              backgroundImage: `url(${woodPlank1})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          />
           <div className="max-w-6xl mx-auto px-4">
-            <p className="font-medium text-[#786858]">Vaultra — Smart Personal Link & Asset Vault</p>
+            <p className="font-semibold text-[#664C35] tracking-wide">
+              Vaultra &mdash; Smart Personal Link &amp; Asset Vault
+            </p>
           </div>
         </footer>
       </div>

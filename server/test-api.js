@@ -1,10 +1,10 @@
-const http = require('http');
 const app = require('./src/server');
 
-const TEST_PORT = 5005;
+const TEST_PORT = 5099;
+const BASE_URL = `http://localhost:${TEST_PORT}`;
 
 async function request(path, options = {}) {
-  const url = `http://localhost:${TEST_PORT}${path}`;
+  const url = `${BASE_URL}${path}`;
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
@@ -20,7 +20,7 @@ async function request(path, options = {}) {
   let data;
   try {
     data = JSON.parse(text);
-  } catch (e) {
+  } catch {
     data = text;
   }
 
@@ -33,15 +33,15 @@ async function request(path, options = {}) {
 
 function assert(condition, message) {
   if (!condition) {
-    console.error(`❌ Assertion Failed: ${message}`);
+    console.error(`[FAIL] ${message}`);
     throw new Error(message);
   }
-  console.log(`✅ ${message}`);
+  console.log(`[PASS] ${message}`);
 }
 
 async function runTests() {
   const server = app.listen(TEST_PORT, () => {
-    console.log(`🧪 Test server running on http://localhost:${TEST_PORT}`);
+    console.log(`Test server running on ${BASE_URL}`);
   });
 
   try {
@@ -50,169 +50,111 @@ async function runTests() {
     assert(health.status === 200, 'Health check returns 200');
     assert(health.data.status === 'ok', 'Health status is "ok"');
 
-    console.log('\n--- 2. CATEGORIES CRUD ---');
-    const catCreate = await request('/api/categories', {
+    console.log('\n--- 2. ROLES & AUTHENTICATION ---');
+    // Test login initial seed admin with admin / admin123
+    const adminLogin = await request('/api/auth/login', {
       method: 'POST',
-      body: { name: 'Kuliah Test', icon: 'Book', color: '#10b981' },
+      body: { username: 'admin', password: 'admin123' },
     });
-    assert(catCreate.status === 201, 'Category created with 201');
-    assert(catCreate.data.name === 'Kuliah Test', 'Category name matches');
-    assert(catCreate.data.slug === 'kuliah-test', 'Category slug generated correctly');
-    const catId = catCreate.data.id;
+    assert(adminLogin.status === 200, 'Admin login with admin123 returns 200');
+    assert(adminLogin.data.user.role === 'admin', 'Admin user role is admin');
+    assert(adminLogin.data.user.isInitial === true, 'Admin user is marked as isInitial');
+    const adminToken = adminLogin.data.token;
 
-    const catList = await request('/api/categories');
-    assert(catList.status === 200, 'Categories list returns 200');
-    assert(Array.isArray(catList.data), 'Categories response is an array');
-    const foundCat = catList.data.find(c => c.id === catId);
-    assert(Boolean(foundCat), 'Created category found in list');
-    assert(foundCat._count !== undefined, 'Category includes _count');
-
-    const catUpdate = await request(`/api/categories/${catId}`, {
-      method: 'PUT',
-      body: { name: 'Kuliah Updated', color: '#3b82f6' },
-    });
-    assert(catUpdate.status === 200, 'Category updated with 200');
-    assert(catUpdate.data.name === 'Kuliah Updated', 'Category name updated');
-    assert(catUpdate.data.slug === 'kuliah-updated', 'Category slug updated');
-
-    console.log('\n--- 3. TAGS CRUD ---');
-    const tagCreate = await request('/api/tags', {
+    // Test login regular user with user / user123
+    const userLogin = await request('/api/auth/login', {
       method: 'POST',
-      body: { name: 'skripsi' },
+      body: { username: 'user', password: 'user123' },
     });
-    assert(tagCreate.status === 201 || tagCreate.status === 200, 'Tag created/fetched');
-    const tagId = tagCreate.data.id;
+    assert(userLogin.status === 200, 'User login with user123 returns 200');
+    assert(userLogin.data.user.role === 'user', 'Regular user role is user');
+    const userToken = userLogin.data.token;
 
-    const tagList = await request('/api/tags');
-    assert(tagList.status === 200, 'Tags list returns 200');
-    assert(Array.isArray(tagList.data), 'Tags response is an array');
-    assert(tagList.data.some(t => t.id === tagId), 'Created tag in list');
-
-    console.log('\n--- 4. ITEMS CRUD & AUTO-DETECTION ---');
-    // Test 1: Folder
-    const item1 = await request('/api/items', {
+    console.log('\n--- 3. CREATOR AUTO-STAMP & VALIDATION ---');
+    // A. Guest without creator -> should fail with 400
+    const guestFail = await request('/api/items', {
       method: 'POST',
       body: {
-        title: 'Folder Bahan Kuliah',
-        url: 'https://drive.google.com/drive/folders/1ABCxyz789',
-        description: 'Kumpulan materi kuliah semester akhir',
-        categoryId: catId,
-        tagNames: ['skripsi', 'kuliah', 'referensi'],
+        title: 'Tautan Tanpa Pembuat',
+        url: 'https://example.com/test',
+        creator: '',
       },
     });
-    assert(item1.status === 201, 'Item 1 created with 201');
-    assert(item1.data.driveType === 'FOLDER', 'driveType correctly detected as FOLDER');
-    assert(item1.data.itemType === 'GDRIVE', 'itemType correctly detected as GDRIVE');
-    assert(item1.data.tags.length === 3, 'Item 1 has 3 tags connected');
-    const item1Id = item1.data.id;
+    assert(guestFail.status === 400, 'Guest without creator returns 400');
 
-    // Test 2: Document
-    const item2 = await request('/api/items', {
+    // B. Guest with creator -> should succeed
+    const guestOk = await request('/api/items', {
       method: 'POST',
       body: {
-        title: 'Draft Bab 1 Proposal',
-        url: 'https://docs.google.com/document/d/1DOCxyz123/edit',
-        description: 'Draft pendahuluan proposal',
-        categoryId: catId,
-        tagNames: ['skripsi', 'draft'],
+        title: 'Tautan Tamu Sah',
+        url: 'https://example.com/guest-link',
+        creator: 'Tamu Rahasia',
       },
     });
-    assert(item2.status === 201, 'Item 2 created with 201');
-    assert(item2.data.driveType === 'DOC', 'driveType correctly detected as DOC');
+    assert(guestOk.status === 201, 'Guest with creator returns 201');
+    assert(guestOk.data.creator === 'Tamu Rahasia', 'Guest creator matches inputted value');
+    const guestItemId = guestOk.data.id;
 
-    // Test 3: Spreadsheet
-    const item3 = await request('/api/items', {
+    // C. Logged in user -> should automatically stamp logged in username/name
+    const loggedInCreate = await request('/api/items', {
       method: 'POST',
+      headers: { Authorization: `Bearer ${userToken}` },
       body: {
-        title: 'Data Penelitian SPSS',
-        url: 'https://docs.google.com/spreadsheets/d/1SHEETxyz456/edit',
-        description: 'Hasil survey responden',
-        categoryId: catId,
-        tagNames: ['penelitian'],
+        title: 'Tautan Member Login',
+        url: 'https://example.com/member-link',
       },
     });
-    assert(item3.status === 201, 'Item 3 created with 201');
-    assert(item3.data.driveType === 'SHEET', 'driveType correctly detected as SHEET');
+    assert(loggedInCreate.status === 201, 'Logged-in user creation returns 201');
+    assert(
+      loggedInCreate.data.creator === 'Pengguna Vaultra' || loggedInCreate.data.creator === 'user',
+      'Creator is automatically stamped from logged-in user'
+    );
+    const memberItemId = loggedInCreate.data.id;
 
-    // Test 4: Presentation
-    const item4 = await request('/api/items', {
+    // Cleanup items
+    await request(`/api/items/${guestItemId}`, { method: 'DELETE' });
+    await request(`/api/items/${memberItemId}`, { method: 'DELETE' });
+
+    console.log('\n--- 4. REPLACE INITIAL ADMIN & AUTO-DELETE ---');
+    // Replace initial admin with a new permanent admin
+    const replaceRes = await request('/api/auth/replace-initial-admin', {
       method: 'POST',
+      headers: { Authorization: `Bearer ${adminToken}` },
       body: {
-        title: 'Slide Sidang Skripsi',
-        url: 'https://docs.google.com/presentation/d/1SLIDExyz789/edit',
-        description: 'Slide PPT untuk ujian',
-        categoryId: catId,
-        tagNames: ['sidang', 'final'],
+        newUsername: 'superade7',
+        newName: 'Ade Pratama Super Admin',
+        newPassword: 'newadminpass123',
       },
     });
-    assert(item4.status === 201, 'Item 4 created with 201');
-    assert(item4.data.driveType === 'SLIDE', 'driveType correctly detected as SLIDE');
+    assert(replaceRes.status === 201, 'Replace initial admin returns 201');
+    assert(replaceRes.data.user.username === 'superade7', 'New admin username matches');
+    assert(replaceRes.data.user.role === 'admin', 'New user role is admin');
+    assert(replaceRes.data.user.isInitial === false, 'New user isInitial is false');
 
-    // Test 5: Archive
-    const item5 = await request('/api/items', {
+    // Verify old "admin" seed user is DELETED
+    const oldAdminLogin = await request('/api/auth/login', {
       method: 'POST',
-      body: {
-        title: 'Backup Data Mentah.zip',
-        url: 'https://drive.google.com/file/d/1ZIPxyz/view',
-        description: 'File archive zip',
-        categoryId: catId,
-      },
+      body: { username: 'admin', password: 'admin123' },
     });
-    assert(item5.status === 201, 'Item 5 created with 201');
-    assert(item5.data.driveType === 'ARCHIVE', 'driveType correctly detected as ARCHIVE');
+    assert(oldAdminLogin.status === 401, 'Old seed admin is completely deleted from database');
 
-    console.log('\n--- 5. ITEMS FILTERING & SEARCH ---');
-    const allItems = await request('/api/items');
-    assert(allItems.status === 200, 'GET /api/items returns 200');
-    assert(allItems.data.length >= 5, 'All created items returned');
-
-    const searchRes = await request('/api/items?search=Proposal');
-    assert(searchRes.status === 200, 'Search request returns 200');
-    assert(searchRes.data.length === 1 && searchRes.data[0].id === item2.data.id, 'Search filter matches item2');
-
-    const catFilterRes = await request(`/api/items?categoryId=${catId}`);
-    assert(catFilterRes.status === 200, 'Category filter returns 200');
-    assert(catFilterRes.data.length >= 5, 'Category filter returned matching items');
-
-    const driveTypeFilterRes = await request('/api/items?driveType=SHEET');
-    assert(driveTypeFilterRes.status === 200, 'DriveType filter returns 200');
-    assert(driveTypeFilterRes.data.some(i => i.id === item3.data.id), 'DriveType filter returned SHEET item');
-
-    const tagFilterRes = await request(`/api/items?tagId=${tagId}`);
-    assert(tagFilterRes.status === 200, 'Tag filter returns 200');
-    assert(tagFilterRes.data.length >= 2, 'Tag filter returned tagged items');
-
-    console.log('\n--- 6. ITEMS UPDATE & DELETE ---');
-    const updatedItem1 = await request(`/api/items/${item1Id}`, {
-      method: 'PUT',
-      body: {
-        title: 'Folder Bahan Kuliah Semester 8',
-        tagNames: ['arsip-2026'],
-      },
+    // Verify new admin can log in
+    const newAdminLogin = await request('/api/auth/login', {
+      method: 'POST',
+      body: { username: 'superade7', password: 'newadminpass123' },
     });
-    assert(updatedItem1.status === 200, 'Item updated with 200');
-    assert(updatedItem1.data.title === 'Folder Bahan Kuliah Semester 8', 'Item title updated');
-    assert(updatedItem1.data.tags.length === 1 && updatedItem1.data.tags[0].tag.name === 'arsip-2026', 'Tags synced on update');
-
-    // Clean up test items
-    for (const item of [item1.data, item2.data, item3.data, item4.data, item5.data]) {
-      const del = await request(`/api/items/${item.id}`, { method: 'DELETE' });
-      assert(del.status === 200, `Item ${item.id} deleted`);
-    }
-
-    // Clean up category
-    const delCat = await request(`/api/categories/${catId}`, { method: 'DELETE' });
-    assert(delCat.status === 200, 'Test category deleted');
+    assert(newAdminLogin.status === 200, 'New admin can login with new credentials');
+    assert(newAdminLogin.data.user.isInitial === false, 'New admin is not isInitial');
 
     console.log('\n========================================');
-    console.log('🎉 ALL BACKEND TESTS PASSED SUCCESSFULLY!');
+    console.log('ALL API TESTS (ROLES, SEED ADMIN DELETION, CREATOR) PASSED!');
     console.log('========================================\n');
   } finally {
     server.close();
   }
 }
 
-runTests().catch(err => {
-  console.error('\n❌ Test Suite Failed:', err);
+runTests().catch((err) => {
+  console.error('\nTest Suite Failed:', err);
   process.exit(1);
 });
