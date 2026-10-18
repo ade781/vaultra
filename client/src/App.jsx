@@ -13,7 +13,8 @@ export default function App() {
   const [error, setError] = useState(null);
 
   // Modal States
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
   const [selectedItemForPopup, setSelectedItemForPopup] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -36,14 +37,35 @@ export default function App() {
     loadItems();
   }, [loadItems]);
 
-  // Handle Add Item
-  const handleAddItem = async (formData) => {
+  // Open Add Modal
+  const handleOpenAddModal = () => {
+    setEditingItem(null);
+    setIsModalOpen(true);
+  };
+
+  // Open Edit Modal from Pop-up
+  const handleStartEdit = (item) => {
+    setSelectedItemForPopup(null);
+    setEditingItem(item);
+    setIsModalOpen(true);
+  };
+
+  // Handle Save (Add or Edit)
+  const handleSaveItem = async (formData, id) => {
     try {
-      const newItem = await api.createItem(formData);
-      setItems((prev) => [newItem, ...prev]);
-      setToastMessage('Link berhasil ditambahkan');
+      if (id) {
+        // Edit mode
+        const updated = await api.updateItem(id, formData);
+        setItems((prev) => prev.map((it) => (it.id === id ? updated : it)));
+        setToastMessage('Link berhasil diperbarui');
+      } else {
+        // Add mode
+        const newItem = await api.createItem(formData);
+        setItems((prev) => [newItem, ...prev]);
+        setToastMessage('Link berhasil ditambahkan');
+      }
     } catch (err) {
-      throw new Error(err.message || 'Gagal menambahkan link');
+      throw new Error(err.message || 'Gagal menyimpan link');
     }
   };
 
@@ -62,7 +84,7 @@ export default function App() {
     <div className="min-h-[100dvh] flex flex-col bg-[#FAF8F5] text-[#261C14]">
       {/* 1. Header Navbar */}
       <Navbar 
-        onOpenAddModal={() => setIsAddModalOpen(true)} 
+        onOpenAddModal={handleOpenAddModal} 
         totalItems={items.length} 
       />
 
@@ -102,7 +124,7 @@ export default function App() {
 
         {/* Empty State */}
         {!loading && !error && items.length === 0 && (
-          <EmptyState onOpenAddModal={() => setIsAddModalOpen(true)} />
+          <EmptyState onOpenAddModal={handleOpenAddModal} />
         )}
 
         {/* Items Grid */}
@@ -129,20 +151,24 @@ export default function App() {
         </div>
       </footer>
 
-      {/* 4. Modal Tambah Link (Hanya 3 Input: Judul, Link, Pembuat) */}
+      {/* 4. Modal Form (Bisa untuk Tambah Baru atau Edit) */}
       <ItemModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onSubmit={handleAddItem}
+        isOpen={isModalOpen}
+        initialData={editingItem}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingItem(null);
+        }}
+        onSubmit={handleSaveItem}
       />
 
-      {/* 5. Pop-up Detail Modal (Muncul saat Card diklik) */}
+      {/* 5. Pop-up Detail Modal (Dengan Barcode dan Tombol Edit) */}
       <ItemDetailModal
         isOpen={Boolean(selectedItemForPopup)}
         item={selectedItemForPopup}
         onClose={() => setSelectedItemForPopup(null)}
+        onEdit={handleStartEdit}
         onDelete={handleDeleteItem}
-        onCopySuccess={(msg) => setToastMessage(msg)}
       />
 
       {/* 6. Toast Notification */}

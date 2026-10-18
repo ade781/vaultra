@@ -26,6 +26,10 @@ export async function createItem(data) {
   return apiClient.post('/items', data);
 }
 
+export async function updateItem(id, data) {
+  return apiClient.put(`/items/${id}`, data);
+}
+
 export async function deleteItem(id) {
   return apiClient.delete(`/items/${id}`);
 }

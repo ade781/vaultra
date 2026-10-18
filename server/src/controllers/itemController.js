@@ -58,6 +58,39 @@ async function createItem(req, res, next) {
   }
 }
 
+async function updateItem(req, res, next) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'ID tidak valid' });
+    }
+
+    const { title, url, creator, sourceEmail } = req.body;
+
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'Judul link wajib diisi' });
+    }
+
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      return res.status(400).json({ error: 'Link URL wajib diisi' });
+    }
+
+    const item = await prisma.item.update({
+      where: { id },
+      data: {
+        title: title.trim(),
+        url: url.trim(),
+        creator: creator && typeof creator === 'string' && creator.trim() ? creator.trim() : 'Anonim',
+        sourceEmail: sourceEmail && typeof sourceEmail === 'string' && sourceEmail.trim() ? sourceEmail.trim() : null,
+      },
+    });
+
+    return res.json(item);
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function deleteItem(req, res, next) {
   try {
     const id = parseInt(req.params.id, 10);
@@ -79,5 +112,6 @@ module.exports = {
   getItems,
   getItemById,
   createItem,
+  updateItem,
   deleteItem,
 };
