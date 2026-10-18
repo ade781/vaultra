@@ -7,12 +7,22 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+}
+
 model Item {
   id          Int      @id @default(autoincrement())
   title       String
   url         String   @db.Text
   creator     String?  @default("Anonim")
-  sourceEmail String?  // Asal Email pemilik/sumber link
+  sourceEmail String?
+  isPrivate   Boolean  @default(false)
+  sharedWith  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
