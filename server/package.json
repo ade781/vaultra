@@ -10,7 +10,7 @@
     "db:generate": "prisma generate",
     "db:seed": "node prisma/seed.js",
     "build": "prisma generate",
-    "postinstall": "prisma generate"
+    "postinstall": "node -e \"process.env.DATABASE_URL=process.env.DATABASE_URL||'postgresql://postgres:Adeasli781781@db.bnkvuniwxgqmxxaoodyh.supabase.co:5432/postgres'; require('child_process').execSync('prisma generate', { stdio: 'inherit', env: process.env });\""
   },
   "prisma": {
     "seed": "node prisma/seed.js"

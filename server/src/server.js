@@ -1,3 +1,11 @@
+// Guaranteed environment defaults for Supabase Cloud
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://postgres:Adeasli781781@db.bnkvuniwxgqmxxaoodyh.supabase.co:5432/postgres';
+}
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'vaultra_jwt_secret_wood_key_2026';
+}
+
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -12,6 +20,8 @@ dotenv.config();
 const itemRoutes = require('./routes/itemRoutes');
 const authRoutes = require('./routes/authRoutes');
 const errorHandler = require('./middlewares/errorHandler');
+const { ensureTablesExist } = require('./config/initDb');
+ensureTablesExist().catch(err => console.error('Table init:', err.message));
 
 const app = express();
 const PORT = process.env.PORT || 5000;
