@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { Archive, LogIn, LogOut, ShieldCheck, Sparkles, FolderLock } from 'lucide-react';
+import { Archive, LogIn, LogOut, ShieldCheck, FolderLock } from 'lucide-react';
 import { getWoodPlank } from '../utils/woodTextures';
 
 export default function Sidebar({
@@ -25,7 +25,7 @@ export default function Sidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed md:sticky top-0 left-0 z-40 h-[100dvh] w-64 bg-[#FDFBF7] border-r border-[#EBE3D5] flex flex-col justify-between transition-transform duration-200 ease-in-out ${
+        className={`fixed md:sticky top-0 left-0 z-40 h-[100dvh] w-64 bg-[#FDFBF7]/90 backdrop-blur-md border-r border-[#EBE3D5] flex flex-col justify-between transition-transform duration-200 ease-in-out ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
@@ -133,3 +133,5 @@ export default function Sidebar({
     </>
   );
 }
+
+

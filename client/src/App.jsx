@@ -8,7 +8,7 @@ import ItemDetailModal from './components/ItemDetailModal';
 import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
 import * as api from './services/api';
-import { Shield, Sparkles, Filter, Globe, Lock, Archive } from 'lucide-react';
+import { Filter, Globe, Lock, Archive } from 'lucide-react';
 import { getWoodPlank } from './utils/woodTextures';
 
 export default function App() {
@@ -144,8 +144,22 @@ export default function App() {
 
   // Dashboard View (Main Page with Sidebar on Left)
   return (
-    <div className="min-h-[100dvh] flex bg-[#FAF8F5] text-[#261C14]">
-      {/* 1. Left Sidebar (Sesuai instruksi: Sidebar tapi kosong, tombol login di bawah dengan hover) */}
+    <div className="min-h-[100dvh] flex text-[#261C14] relative overflow-x-hidden">
+      {/* 1. Blurred Bright Wood Plank Background for Main Dashboard (Kayu Cerah: wood-plank-4) */}
+      <div 
+        className="fixed inset-0 pointer-events-none z-0"
+        style={{
+          backgroundImage: `url(${getWoodPlank(4)})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: 'blur(16px) brightness(1.08)',
+          transform: 'scale(1.08)',
+        }}
+      />
+      {/* Soft Light Overlay to keep dashboard luminous, crisp & readable */}
+      <div className="fixed inset-0 pointer-events-none z-0 bg-[#FAF7F2]/82 backdrop-brightness-105" />
+
+      {/* 2. Left Sidebar (Semi-transparent floating over the blurred wood) */}
       <Sidebar
         user={currentUser}
         onNavigateLogin={() => {
@@ -157,8 +171,8 @@ export default function App() {
         onCloseMobile={() => setIsSidebarMobileOpen(false)}
       />
 
-      {/* 2. Main Workspace Layout */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+      {/* 3. Main Workspace Layout */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen relative z-10">
         {/* Top Navbar */}
         <Navbar
           onOpenAddModal={handleOpenAddModal}
@@ -349,4 +363,6 @@ export default function App() {
     </div>
   );
 }
+
+
 

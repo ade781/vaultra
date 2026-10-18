@@ -98,30 +98,38 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
   ];
 
   return (
-    <div 
-      className={`min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-8 transition-colors duration-700 relative overflow-hidden select-none ${
-        isLampOn ? 'bg-[#221B13]' : 'bg-[#090705]'
-      }`}
-    >
-      {/* 1. Ambient Background Lighting Glow (Lebih terang, hangat, dan nyata saat lampu ON) */}
-      {isLampOn && (
-        <>
-          {/* Wide Warm Amber Room Glow radiating across the wall from the lamp */}
-          <div 
-            className="absolute inset-0 pointer-events-none transition-opacity duration-700"
-            style={{
-              background: 'radial-gradient(circle at 28% 42%, rgba(255, 215, 90, 0.38) 0%, rgba(225, 160, 50, 0.22) 38%, rgba(140, 90, 25, 0.12) 68%, transparent 88%)',
-            }}
-          />
-          {/* Secondary Soft Room Fill Light */}
-          <div 
-            className="absolute inset-0 pointer-events-none transition-opacity duration-700"
-            style={{
-              background: 'radial-gradient(ellipse at 50% 25%, rgba(255, 220, 120, 0.18) 0%, rgba(180, 120, 40, 0.08) 50%, transparent 75%)',
-            }}
-          />
-        </>
-      )}
+    <div className="min-h-[100dvh] w-full flex items-center justify-center p-4 sm:p-8 relative overflow-hidden select-none">
+      
+      {/* 1. Blurred Bright Wood Plank Background for Login Page (Kayu Cerah: wood-plank-7) */}
+      <div 
+        className="absolute inset-0 pointer-events-none z-0 transition-all duration-700"
+        style={{
+          backgroundImage: `url(${getWoodPlank(7)})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          filter: isLampOn 
+            ? 'blur(16px) brightness(1.15) saturate(1.1)' 
+            : 'blur(16px) brightness(0.18) saturate(0.5)',
+          transform: 'scale(1.08)',
+        }}
+      />
+
+      {/* 2. Ambient Lighting Glow radiating from the lamp over the wooden wall */}
+      <div 
+        className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
+          isLampOn ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={{
+          background: 'radial-gradient(circle at 28% 42%, rgba(255, 225, 120, 0.45) 0%, rgba(240, 175, 65, 0.28) 38%, rgba(180, 120, 40, 0.16) 68%, rgba(40, 25, 12, 0.35) 100%)',
+        }}
+      />
+
+      {/* 3. Dark Shadow Overlay when Lamp is OFF */}
+      <div 
+        className={`absolute inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
+          isLampOn ? 'opacity-0' : 'opacity-92 bg-[#090705]'
+        }`}
+      />
 
       {/* 2. Floating Firefly Particles */}
       {isLampOn && (
@@ -357,5 +365,6 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
     </div>
   );
 }
+
 
 
