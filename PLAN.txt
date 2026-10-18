@@ -1,0 +1,167 @@
+================================================================================
+                               VAULTRA - PROJECT PLAN
+         A Smart Digital Vault for Google Drive Links & Universal Bookmarks
+================================================================================
+
+1. RINGKASAN PROYEK
+--------------------------------------------------------------------------------
+Nama Aplikasi : Vaultra
+Tagline       : Smart Personal Vault for Links, Assets, and Digital Resources
+Model Pengguna: Personal / Single-User (fase awal fokus kecepatan & utilitas)
+Tujuan Utama  : Menyimpan, mengorganisir, dan mengelola link Google Drive dengan
+                rapi menggunakan kategori & tags, dengan arsitektur yang siap
+                diekspansi menjadi universal web bookmark di masa depan.
+
+
+2. TECH STACK & ARSITEKTUR
+--------------------------------------------------------------------------------
+A. Frontend
+   - Framework  : React (Vite)
+   - Styling    : Tailwind CSS
+   - Icons      : Lucide React
+   - State/Fetch: React Hooks / Axios / TanStack Query (opsional)
+
+B. Backend
+   - Runtime    : Node.js
+   - Framework  : Express.js
+   - ORM        : Prisma ORM (mempermudah migrasi database)
+   - Validation : Zod / Joi
+
+C. Database
+   - Development: MySQL Lokal (mudah ditest di komputer lokal)
+   - Migration  : Supabase (PostgreSQL) saat aplikasi sudah siap deploy
+   * Catatan Arsitektur: Karena menggunakan Prisma ORM, transisi dari MySQL
+     ke Supabase (PostgreSQL) hanya membutuhkan perubahan pada provider schema:
+     `datasource db { provider = "mysql" }` -> `provider = "postgresql"`
+
+
+3. STRUKTUR DIREKTORI (MONOREPO)
+--------------------------------------------------------------------------------
+vaultra/
+├── client/                     # Frontend (React + Vite + Tailwind CSS)
+│   ├── public/
+│   ├── src/
+│   │   ├── components/         # Navbar, Sidebar, Modal, Cards, FilterBar
+│   │   ├── hooks/              # Custom hooks (data fetching, search)
+│   │   ├── pages/              # Dashboard, CategoryView, Settings
+│   │   ├── services/           # API client service (axios / fetch)
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── index.css
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── vite.config.js
+│
+├── server/                     # Backend (Node.js + Express + Prisma)
+│   ├── prisma/
+│   │   └── schema.prisma       # Definisi skema database
+│   ├── src/
+│   │   ├── controllers/        # Logika handler API (items, categories, tags)
+│   │   ├── routes/             # Endpoint express (/api/items, /api/categories)
+│   │   ├── middlewares/        # Error handler & input validator
+│   │   └── server.js           # Entry point Express
+│   ├── .env                    # DATABASE_URL mysql / postgresql
+│   └── package.json
+│
+└── README.md
+
+
+4. PERANCANGAN SKEMA DATABASE (PRISMA SCHEMA DRAFT)
+--------------------------------------------------------------------------------
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  slug        String   @unique
+  icon        String?  // Nama icon Lucide (misal: "folder", "book", "code")
+  color       String?  // Hex/Tailwind color badge
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  items       Item[]
+}
+
+model Tag {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  items       ItemTag[]
+  createdAt   DateTime  @default(now())
+}
+
+model Item {
+  id          Int       @id @default(autoincrement())
+  title       String    // Judul link / nama file
+  url         String    // Link URL lengkap (Google Drive link atau URL web)
+  description String?   // Catatan tambahan mengenai isi link
+  itemType    String    @default("GDRIVE") // 'GDRIVE' | 'WEB_LINK' | 'NOTE'
+  driveType   String?   // 'FOLDER' | 'DOC' | 'SHEET' | 'SLIDE' | 'ARCHIVE' | 'OTHER'
+  categoryId  Int?
+  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tags        ItemTag[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model ItemTag {
+  itemId      Int
+  tagId       Int
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tag         Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, tagId])
+}
+
+
+5. FITUR SISTEM
+--------------------------------------------------------------------------------
+A. Fase 1: Core Google Drive Link Vault
+   1. Input & Simpan Link:
+      - Form cepat: Paste URL Google Drive, isi judul, pilih kategori, pilih/buat tag.
+      - Deteksi otomatis jenis file Drive dari pola URL (Folder / Doc / Sheet / dll).
+   2. Organisasi Data:
+      - Manajemen Kategori / Folder (CRUD kategori).
+      - Multi-tagging (contoh: #kuliah, #client-a, #arsip2026).
+   3. Pencarian & Filter Cepat:
+      - Search bar instan berdasarkan judul, URL, atau deskripsi.
+      - Filter panel: Berdasarkan kategori atau klik tag spesifik.
+   4. Tampilan Dashboard Modern:
+      - Grid view card atau List view table.
+      - Action button: Copy link 1-klik, Buka langsung di tab baru, Edit, Hapus.
+
+B. Fase 2: Universal Bookmark & Resource Expansion
+   1. Support untuk General Web Links (Artikel blog, GitHub repo, dokumentasi).
+   2. Fetching favicon atau metadata OpenGraph web secara otomatis.
+   3. Ekspor & Impor Data (format JSON atau CSV).
+   4. Migrasi mudah ke Supabase PostgreSQL saat testing lokal sudah tuntas.
+
+
+6. ROADMAP IMPLEMENTASI (STEP-BY-STEP)
+--------------------------------------------------------------------------------
+Langkah 1: Inisialisasi Proyek Monorepo
+   - Buat folder `vaultra/` dengan subfolder `server/` dan `client/`.
+   - Setup Node.js + Express di `server/`.
+   - Setup React + Vite + Tailwind CSS di `client/`.
+
+Langkah 2: Konfigurasi Database & Prisma (MySQL)
+   - Install `@prisma/client` dan `prisma`.
+   - Buat file `.env` dengan koneksi MySQL lokal.
+   - Run `npx prisma db push` atau `prisma migrate dev`.
+
+Langkah 3: Implementasi Backend REST API
+   - API Kategori: GET, POST, PUT, DELETE `/api/categories`.
+   - API Tags: GET, POST `/api/tags`.
+   - API Items: GET (dengan query search & filter), POST, PUT, DELETE `/api/items`.
+
+Langkah 4: Pembangunan Antarmuka Frontend (React + Tailwind)
+   - Layout utama (Sidebar kategori + Header search + Main content area).
+   - Modal form tambah/edit link dengan tag autocomplete.
+   - Komponen card/list link dengan aksi copy & redirect.
+   - Status indikator (badge kategori, tag pills).
+
+Langkah 5: Testing Lokal & Polish
+   - Uji alur penambahan link Drive dan penataan folder/tag.
+   - Validasi error handling & responsiveness tampilan.
+
+Langkah 6: Persiapan Migrasi ke Supabase
+   - Buat proyek di Supabase saat siap.
+   - Ganti connection string DATABASE_URL ke Supabase PostgreSQL.
+   - Deploy backend & frontend ke hosting yang diinginkan.
+================================================================================
