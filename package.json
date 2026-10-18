@@ -7,7 +7,7 @@
     "build": "cd client && npm install && npm run build",
     "client:dev": "npm --prefix client run dev",
     "server:dev": "npm --prefix server run dev",
-    "vercel-build": "cd server && npm install && npm run db:generate && cd ../client && npm install && npm run build"
+    "vercel-build": "cd server && npm install && node -e \"process.env.DATABASE_URL=process.env.DATABASE_URL||'postgresql://postgres:Adeasli781781@db.bnkvuniwxgqmxxaoodyh.supabase.co:5432/postgres'; require('child_process').execSync('npx prisma db push --accept-data-loss && node prisma/seed.js && npx prisma generate', { stdio: 'inherit', env: process.env });\" && cd ../client && npm install && npm run build"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
