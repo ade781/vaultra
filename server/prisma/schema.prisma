@@ -8,10 +8,11 @@ generator client {
 }
 
 model Item {
-  id        Int      @id @default(autoincrement())
-  title     String
-  url       String   @db.Text
-  creator   String?  @default("Anonim")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  title       String
+  url         String   @db.Text
+  creator     String?  @default("Anonim")
+  sourceEmail String?  // Asal Email pemilik/sumber link
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

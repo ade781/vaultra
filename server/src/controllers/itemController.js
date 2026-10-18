@@ -33,7 +33,7 @@ async function getItemById(req, res, next) {
 
 async function createItem(req, res, next) {
   try {
-    const { title, url, creator } = req.body;
+    const { title, url, creator, sourceEmail } = req.body;
 
     if (!title || typeof title !== 'string' || !title.trim()) {
       return res.status(400).json({ error: 'Judul link wajib diisi' });
@@ -48,6 +48,7 @@ async function createItem(req, res, next) {
         title: title.trim(),
         url: url.trim(),
         creator: creator && typeof creator === 'string' && creator.trim() ? creator.trim() : 'Anonim',
+        sourceEmail: sourceEmail && typeof sourceEmail === 'string' && sourceEmail.trim() ? sourceEmail.trim() : null,
       },
     });
 
