@@ -23,7 +23,9 @@ async function ensureTablesExist() {
       CREATE TABLE IF NOT EXISTS "Item" (
         "id" SERIAL PRIMARY KEY,
         "title" TEXT NOT NULL,
-        "url" TEXT NOT NULL,
+        "url" TEXT,
+        "type" TEXT NOT NULL DEFAULT 'link',
+        "metadata" JSONB,
         "creator" TEXT DEFAULT 'Anonim',
         "sourceEmail" TEXT,
         "isPrivate" BOOLEAN NOT NULL DEFAULT false,
@@ -31,6 +33,17 @@ async function ensureTablesExist() {
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // 2b. Safe schema migrations for existing Item table
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Item" ADD COLUMN IF NOT EXISTS "type" TEXT NOT NULL DEFAULT 'link';
+    `);
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Item" ADD COLUMN IF NOT EXISTS "metadata" JSONB;
+    `);
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Item" ALTER COLUMN "url" DROP NOT NULL;
     `);
 
     // 3. Ensure seed admin exists

@@ -21,7 +21,9 @@ model User {
 model Item {
   id          Int      @id @default(autoincrement())
   title       String
-  url         String   @db.Text
+  url         String?  @db.Text
+  type        String   @default("link")
+  metadata    Json?
   creator     String?  @default("Anonim")
   sourceEmail String?
   isPrivate   Boolean  @default(false)

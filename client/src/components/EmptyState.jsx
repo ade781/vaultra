@@ -2,7 +2,7 @@
 import { Archive, Plus } from 'lucide-react';
 import { getWoodPlank } from '../utils/woodTextures';
 
-export default function EmptyState({ onOpenAddModal }) {
+export default function EmptyState({ onOpenAddModal, compartmentName = null }) {
   const woodTexture = getWoodPlank(9);
   const btnWood = getWoodPlank(4);
 
@@ -31,11 +31,15 @@ export default function EmptyState({ onOpenAddModal }) {
       </div>
       
       <h3 className="text-xl font-extrabold text-[#261C14] mb-2 tracking-tight">
-        Brankas Kayu Masih Kosong
+        {compartmentName
+          ? `Kompartemen ${compartmentName} Masih Kosong`
+          : 'Brankas Kayu Masih Kosong'}
       </h3>
       
       <p className="text-xs sm:text-sm text-[#786858] max-w-md mb-6 leading-relaxed">
-        Belum ada tautan yang disimpan di dalam brankas. Mulai simpan tautan penting dan kelola hak akses publik maupun privat sekarang.
+        {compartmentName
+          ? `Belum ada item yang tersimpan pada kategori ${compartmentName}. Klik tombol di bawah untuk menambahkannya.`
+          : 'Belum ada item atau tautan yang disimpan di dalam brankas. Mulai simpan kartu, dokumen, tagihan, atau kredensial rahasia Anda sekarang.'}
       </p>
 
       <button
@@ -49,7 +53,7 @@ export default function EmptyState({ onOpenAddModal }) {
         }}
       >
         <Plus className="w-4 h-4 stroke-[2.5] text-[#FFE8C2]" />
-        <span>Tambah Tautan Sekarang</span>
+        <span>Tambah ke Kompartemen</span>
       </button>
     </div>
   );
