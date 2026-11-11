@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Menu, Shield, ShieldCheck, Download, Volume2, VolumeX } from 'lucide-react';
+import {
+  Plus,
+  Menu,
+  Shield,
+  ShieldCheck,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import VaultraLogo from './VaultraLogo';
 import { getWoodPlank } from '../utils/woodTextures';
 import { isSoundMuted, toggleSoundMute } from '../utils/soundHelper';
+
+const TOP_NAV_LINKS = [
+  { id: 'dashboard', label: 'Beranda' },
+  { id: 'calendar', label: 'Kalender' },
+  { id: 'security', label: 'Keamanan' },
+  { id: 'bills', label: 'Tagihan' },
+  { id: 'backup', label: 'Cadangan' },
+  { id: 'emergency', label: 'SOS' },
+];
 
 export default function Navbar({
   onOpenAddModal,
@@ -11,6 +27,8 @@ export default function Navbar({
   totalItems = 0,
   isPrivacyMode = false,
   onTogglePrivacyMode,
+  currentView = 'dashboard',
+  onNavigateView,
 }) {
   const barWood = getWoodPlank(0);
   const btnWood = getWoodPlank(3);
@@ -35,7 +53,7 @@ export default function Navbar({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-[#FBF5EB]/95 backdrop-blur-md border-b border-[#E5DACB] relative shadow-xs">
+    <header className="sticky top-0 z-30 bg-[#FBF5EB] border-b border-[#E5DACB] relative shadow-xs">
       {/* Bottom Wood Plank Accent Strip */}
       <div
         className="absolute bottom-0 left-0 right-0 h-1 opacity-80"
@@ -47,7 +65,7 @@ export default function Navbar({
       />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2">
-        {/* Left: Mobile Toggle & Brand Logo with Wood Accent */}
+        {/* Left: Mobile Toggle & Brand Logo */}
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -58,7 +76,11 @@ export default function Navbar({
             <Menu className="w-5 h-5 stroke-[2.2]" />
           </button>
 
-          <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => onNavigateView && onNavigateView('dashboard')}
+            className="flex items-center gap-2.5 cursor-pointer text-left focus:outline-none"
+          >
             <VaultraLogo variant="icon" size={38} className="drop-shadow-xs" />
             <div className="hidden sm:block">
               <span className="text-base font-extrabold tracking-tight text-[#261C14] block leading-tight">
@@ -68,10 +90,39 @@ export default function Navbar({
                 Woodcraft Vault
               </span>
             </div>
-          </div>
+          </button>
         </div>
 
-        {/* Right Section: Sound Toggle, Privacy Shield Toggle, Backup, Counter & Add Button */}
+        {/* Center: Desktop Top Navigation Pills */}
+        {onNavigateView && (
+          <nav className="hidden lg:flex items-center gap-1 p-1 rounded-xl bg-[#FAF4ED] border border-[#DEC8B0]/80">
+            {TOP_NAV_LINKS.map((link) => {
+              const isActive = currentView === link.id;
+              const isEmergency = link.id === 'emergency';
+
+              return (
+                <button
+                  key={link.id}
+                  type="button"
+                  onClick={() => onNavigateView(link.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors duration-100 cursor-pointer ${
+                    isActive
+                      ? isEmergency
+                        ? 'bg-rose-700 text-white shadow-xs'
+                        : 'bg-[#2E1A0F] text-[#FFE3B3] shadow-xs'
+                      : isEmergency
+                      ? 'text-rose-700 hover:bg-rose-100/70'
+                      : 'text-[#664C35] hover:text-[#261C14] hover:bg-[#F2E5D5]'
+                  }`}
+                >
+                  {link.label}
+                </button>
+              );
+            })}
+          </nav>
+        )}
+
+        {/* Right Section: Sound Toggle, Privacy Shield Toggle, Item Counter & Add Button */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Audio Soundscape Toggle Button */}
           <button
@@ -104,8 +155,8 @@ export default function Navbar({
               }`}
               title={
                 isPrivacyMode
-                  ? 'Privacy Shield Aktif (Klik untuk membuka sensor)'
-                  : 'Aktifkan Privacy Shield (Sensor nomor kartu & data rahasia)'
+                  ? 'Privacy Shield Aktif (Sensor nomor kartu & data rahasia)'
+                  : 'Aktifkan Privacy Shield'
               }
             >
               {isPrivacyMode ? (
@@ -122,22 +173,8 @@ export default function Navbar({
             </button>
           )}
 
-          {/* Backup Button */}
-          {onBackup && (
-            <button
-              type="button"
-              onClick={onBackup}
-              className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-[#FAF4ED] text-[#7A583B] border border-[#DEC8B0] hover:bg-[#F2E5D5] transition-colors duration-100 cursor-pointer shadow-xs touch-manipulation"
-              title="Cadangkan Brankas (Backup JSON)"
-              aria-label="Cadangkan Brankas ke file JSON"
-            >
-              <Download className="w-3.5 h-3.5 text-[#8C6239]" />
-              <span className="hidden md:inline">Cadangkan</span>
-            </button>
-          )}
-
           {/* Item Counter */}
-          <div className="hidden md:flex items-center px-3 py-1.5 rounded-xl bg-[#F4E8D7] border border-[#DEC8B0] text-xs font-semibold text-[#664C35]">
+          <div className="hidden sm:flex items-center px-3 py-1.5 rounded-xl bg-[#F4E8D7] border border-[#DEC8B0] text-xs font-semibold text-[#664C35]">
             <span className="text-[#8C6239] font-bold mr-1">{totalItems}</span> Kompartemen
           </div>
 

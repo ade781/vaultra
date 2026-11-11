@@ -8,24 +8,27 @@ import ItemDetailModal from './components/ItemDetailModal';
 import UrgentAlertRibbon from './components/UrgentAlertRibbon';
 import EmptyState from './components/EmptyState';
 import Toast from './components/Toast';
+
+// 5 Dedicated Vaultra Pages
+import CalendarPage from './components/CalendarPage';
+import SecurityPage from './components/SecurityPage';
+import BillsPage from './components/BillsPage';
+import BackupPage from './components/BackupPage';
+import EmergencyPage from './components/EmergencyPage';
+
 import * as api from './services/api';
 import { getItemUrgency } from './utils/cardHelper';
 import {
-  Globe,
-  Lock,
-  CreditCard,
-  FileText,
-  Receipt,
-  Key,
-  BookOpen,
-  Link as LinkIcon,
-  LayoutGrid,
-  Clock,
+  Search,
   Plus,
+  Sparkles,
+  Layers,
+  Shield,
+  X,
 } from 'lucide-react';
 
 export default function App() {
-  // Navigation View: 'dashboard' | 'login'
+  // Navigation View: 'dashboard' | 'calendar' | 'security' | 'bills' | 'backup' | 'emergency' | 'login'
   const [currentView, setCurrentView] = useState('dashboard');
 
   // Auth State
@@ -36,11 +39,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Compartment Filter: 'all' | 'link' | 'card_reminder' | 'document' | 'bill' | 'credential' | 'note' | 'urgent'
-  const [compartmentFilter, setCompartmentFilter] = useState('all');
-
-  // Access Filter: 'all' | 'public' | 'private'
-  const [accessFilter, setAccessFilter] = useState('all');
+  // Clean Dashboard Search State
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Privacy Shield State
   const [isPrivacyMode, setIsPrivacyMode] = useState(false);
@@ -111,7 +111,13 @@ export default function App() {
     return () => window.removeEventListener('vaultra:unauthorized', handleUnauthorized);
   }, [loadItems, showToast]);
 
-  // Non-blocking Concurrent View Navigators
+  // View Navigation
+  const handleNavigateView = (view) => {
+    startTransition(() => {
+      setCurrentView(view);
+    });
+  };
+
   const handleNavigateLogin = () => {
     startTransition(() => {
       setCurrentView('login');
@@ -145,6 +151,18 @@ export default function App() {
     loadItems();
   };
 
+  // Panic Lockdown Handler
+  const handlePanicLockdown = () => {
+    api.logout();
+    startTransition(() => {
+      setCurrentUser(null);
+      setCurrentView('dashboard');
+    });
+    setItems([]);
+    showToast('Mode Panic Lockdown aktif! Sesi dibersihkan seketika.', 'error');
+    loadItems();
+  };
+
   // Open Add Modal
   const handleOpenAddModal = () => {
     setEditingItem(null);
@@ -165,10 +183,12 @@ export default function App() {
         const updated = await api.updateItem(id, formData);
         setItems((prev) => prev.map((it) => (it.id === id ? updated : it)));
         showToast('Kompartemen brankas berhasil diperbarui', 'success');
+        return updated;
       } else {
         const newItem = await api.createItem(formData);
         setItems((prev) => [newItem, ...prev]);
         showToast('Item berhasil ditambahkan ke brankas', 'success');
+        return newItem;
       }
     } catch (err) {
       showToast(err.message || 'Gagal menyimpan ke brankas', 'error');
@@ -188,10 +208,25 @@ export default function App() {
     }
   };
 
-  // Handle Item Updated directly from Quick Extend in Detail Modal
+  // Handle Quick Extend in Detail Modal
   const handleItemUpdated = (updated) => {
     setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
     showToast('Masa aktif berhasil diperpanjang!', 'success');
+  };
+
+  // Handle Restore Backup
+  const handleRestoreItems = async (itemsToRestore) => {
+    try {
+      setLoading(true);
+      await api.restoreBackup(itemsToRestore);
+      showToast(`Berhasil memulihkan ${itemsToRestore.length} item ke dalam brankas!`, 'success');
+      await loadItems();
+    } catch (err) {
+      showToast(err.message || 'Gagal memulihkan cadangan', 'error');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle Export Backup JSON
@@ -204,93 +239,53 @@ export default function App() {
     }
   };
 
-  // Single-pass O(N) calculation for filtered items & badge counts
-  const { filteredItems, counts } = useMemo(() => {
-    let urgent = 0;
-    let link = 0;
-    let card = 0;
-    let doc = 0;
-    let bill = 0;
-    let cred = 0;
-    let note = 0;
-    let publicCount = 0;
-    let privateCount = 0;
-    const filtered = [];
+  // Clean Dashboard: Filter items solely based on quick search query (zero filter tab clutter!)
+  const cleanDashboardItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase().trim();
+    return items.filter((item) => {
+      const matchTitle = item.title?.toLowerCase().includes(q);
+      const matchCreator = item.creator?.toLowerCase().includes(q);
+      const matchType = item.type?.toLowerCase().includes(q);
+      const matchUrl = item.url?.toLowerCase().includes(q);
+      const matchProvider = item.metadata?.provider?.toLowerCase().includes(q);
+      const matchUsername = item.metadata?.username?.toLowerCase().includes(q);
+      const matchDocNo = item.metadata?.docNumber?.toLowerCase().includes(q);
+      const matchDocHolder = item.metadata?.docHolder?.toLowerCase().includes(q);
+      const matchAccountNo = item.metadata?.accountNo?.toLowerCase().includes(q);
+      const matchNotes = item.metadata?.notes?.toLowerCase().includes(q);
 
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const isPriv = Boolean(item.isPrivate);
-      if (isPriv) privateCount++;
-      else publicCount++;
-
-      const type = item.type || 'link';
-      if (type === 'link') link++;
-      else if (type === 'card_reminder') card++;
-      else if (type === 'document') doc++;
-      else if (type === 'bill') bill++;
-      else if (type === 'credential') cred++;
-      else if (type === 'note') note++;
-
-      const urgency = getItemUrgency(item);
-      const isUrgent = urgency.isUrgent;
-      if (isUrgent) urgent++;
-
-      // Filter verification
-      if (accessFilter === 'public' && isPriv) continue;
-      if (accessFilter === 'private' && !isPriv) continue;
-
-      if (compartmentFilter === 'all') {
-        filtered.push(item);
-      } else if (compartmentFilter === 'urgent') {
-        if (isUrgent) filtered.push(item);
-      } else if (type === compartmentFilter) {
-        filtered.push(item);
+      // Match cards in card_reminder
+      let matchCard = false;
+      if (Array.isArray(item.metadata?.cards)) {
+        matchCard = item.metadata.cards.some(
+          (c) =>
+            c.label?.toLowerCase().includes(q) ||
+            c.lastDigits?.toLowerCase().includes(q) ||
+            c.notes?.toLowerCase().includes(q)
+        );
       }
-    }
 
-    return {
-      filteredItems: filtered,
-      counts: {
-        total: items.length,
-        urgent,
-        link,
-        card,
-        doc,
-        bill,
-        cred,
-        note,
-        publicCount,
-        privateCount,
-      },
-    };
-  }, [items, compartmentFilter, accessFilter]);
+      return (
+        matchTitle ||
+        matchCreator ||
+        matchType ||
+        matchUrl ||
+        matchProvider ||
+        matchUsername ||
+        matchDocNo ||
+        matchDocHolder ||
+        matchAccountNo ||
+        matchNotes ||
+        matchCard
+      );
+    });
+  }, [items, searchQuery]);
 
-  const compartmentTabs = useMemo(() => {
-    const urgentTab = {
-      id: 'urgent',
-      label: 'Urgent (≤ 7 Hari)',
-      icon: Clock,
-      count: counts.urgent,
-      isSpecial: true,
-    };
-
-    const standardTabs = [
-      { id: 'link', label: 'Tautan', icon: LinkIcon, count: counts.link },
-      { id: 'card_reminder', label: 'Kartu', icon: CreditCard, count: counts.card },
-      { id: 'document', label: 'Dokumen', icon: FileText, count: counts.doc },
-      { id: 'bill', label: 'Tagihan', icon: Receipt, count: counts.bill },
-      { id: 'credential', label: 'Kredensial', icon: Key, count: counts.cred },
-      { id: 'note', label: 'Catatan', icon: BookOpen, count: counts.note },
-    ];
-
-    const allTab = { id: 'all', label: 'Semua', icon: LayoutGrid, count: counts.total };
-
-    // Dynamic Tab Positioning: Move urgent tab to 2nd position (immediately after 'Semua') if urgentCount > 0
-    if (counts.urgent > 0) {
-      return [allTab, urgentTab, ...standardTabs];
-    }
-    return [allTab, ...standardTabs, urgentTab];
-  }, [counts]);
+  // Urgent items count
+  const urgentCount = useMemo(() => {
+    return items.reduce((acc, it) => (getItemUrgency(it).isUrgent ? acc + 1 : acc), 0);
+  }, [items]);
 
   // Render Login View if active
   if (currentView === 'login') {
@@ -312,9 +307,11 @@ export default function App() {
         }}
       />
 
-      {/* 1. Left Sidebar Navigation */}
+      {/* 1. Left Sidebar Navigation with dedicated Menu Brankas */}
       <Sidebar
         user={currentUser}
+        currentView={currentView}
+        onNavigateView={handleNavigateView}
         onNavigateLogin={handleNavigateLogin}
         onLogout={handleLogout}
         isOpenMobile={isSidebarMobileOpen}
@@ -323,212 +320,216 @@ export default function App() {
 
       {/* 2. Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 z-10">
-        {/* Sticky Top Navbar with Privacy Shield Toggle & Fast Backup Button */}
+        {/* Sticky Top Navbar with Direct Navigation Pills */}
         <Navbar
           onOpenAddModal={handleOpenAddModal}
           onToggleSidebar={() => setIsSidebarMobileOpen(true)}
           onBackup={handleExportBackup}
-          totalItems={counts.total}
+          totalItems={items.length}
           isPrivacyMode={isPrivacyMode}
           onTogglePrivacyMode={() => setIsPrivacyMode((prev) => !prev)}
+          currentView={currentView}
+          onNavigateView={handleNavigateView}
         />
 
-        {/* Content Body */}
+        {/* Dynamic Page Router */}
         <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          {/* Top Woodcraft Plank Header with Integrated Access Filters, Backup Button & Privacy Indicator */}
-          <div
-            className="w-full mb-4 px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl border border-[#B48248]/60 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(135deg, #2D1A0E 0%, #3F2413 45%, #241308 100%)',
-            }}
-          >
-            {/* Top Gloss & Brass Inlay */}
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FFE3B3]/60 to-transparent pointer-events-none" />
-            <div className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#B48248]/50 to-transparent pointer-events-none" />
-
-            {/* Left: Brand / Section Label */}
-            <div className="flex items-center gap-2.5 relative z-10">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#FFDF80] shadow-[0_0_8px_rgba(255,223,128,0.9)]" />
-              <div>
-                <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-[#FAF8F5] drop-shadow-sm leading-tight">
-                  Kompartemen Brankas
-                </h1>
-                <span className="text-[10px] text-[#D4A373] font-medium block">
-                  Penyimpanan Aman Kayu Mahoni &amp; Kuningan
-                </span>
-              </div>
-            </div>
-
-            {/* Right: Access Filters (Semua | Publik | Private) */}
-            <div className="flex items-center gap-2 flex-wrap relative z-10">
-              {/* Access Filter Pills */}
-              <div className="inline-flex items-center p-1 rounded-xl bg-[#1C1008]/80 border border-[#B48248]/40 text-xs font-semibold shadow-inner">
-                <button
-                  type="button"
-                  onClick={() => setAccessFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg transition-colors duration-100 cursor-pointer ${
-                    accessFilter === 'all'
-                      ? 'bg-[#E5B57A] text-[#24140B] font-bold shadow-sm'
-                      : 'text-[#D7C4B0] hover:text-[#FAF8F5]'
-                  }`}
-                >
-                  Semua ({counts.total})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAccessFilter('public')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors duration-100 cursor-pointer ${
-                    accessFilter === 'public'
-                      ? 'bg-[#7CB364] text-[#14260D] font-bold shadow-sm'
-                      : 'text-[#D7C4B0] hover:text-[#FAF8F5]'
-                  }`}
-                >
-                  <Globe className="w-3 h-3" />
-                  <span>Publik ({counts.publicCount})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAccessFilter('private')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors duration-100 cursor-pointer ${
-                    accessFilter === 'private'
-                      ? 'bg-[#FFCC00] text-[#26160D] font-bold shadow-sm'
-                      : 'text-[#D7C4B0] hover:text-[#FAF8F5]'
-                  }`}
-                >
-                  <Lock className="w-3 h-3" />
-                  <span>Private ({counts.privateCount})</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Horizontal Scrollable Compartment Category Tab Bar */}
-          <div className="relative w-full mb-6">
-            <div className="w-full overflow-x-auto pb-1.5 scrollbar-none">
-              <div className="flex items-center gap-2 min-w-max pr-8 sm:pr-0">
-                {compartmentTabs.map((tab) => {
-                  const IconComp = tab.icon;
-                  const isSelected = compartmentFilter === tab.id;
-                  const isUrgentTab = tab.id === 'urgent';
-
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setCompartmentFilter(tab.id)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors duration-100 cursor-pointer shrink-0 shadow-xs ${
-                        isSelected
-                          ? isUrgentTab
-                            ? 'bg-[#EF4444] text-white border-[#DC2626] ring-2 ring-[#FCA5A5]'
-                            : 'bg-[#2E1A0F] text-[#FFE3B3] border-[#D49132] ring-1 ring-[#D49132]'
-                          : isUrgentTab && tab.count > 0
-                          ? 'bg-[#FEF2F2] text-[#991B1B] border-[#FCA5A5] hover:bg-[#FEE2E2]'
-                          : 'bg-[#FFFFFF] text-[#664C35] border-[#E5DACB] hover:bg-[#F7EFE4] hover:text-[#261C14]'
-                      }`}
-                    >
-                      <IconComp
-                        className={`w-3.5 h-3.5 ${
-                          isSelected
-                            ? isUrgentTab
-                              ? 'text-white'
-                              : 'text-[#FFDF80]'
-                            : isUrgentTab && tab.count > 0
-                            ? 'text-rose-600 animate-pulse'
-                            : 'text-[#8C6239]'
-                        }`}
-                      />
-                      <span>{tab.label}</span>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                          isSelected
-                            ? isUrgentTab
-                              ? 'bg-white/20 text-white'
-                              : 'bg-[#D49132] text-[#241208]'
-                            : isUrgentTab && tab.count > 0
-                            ? 'bg-[#EF4444] text-white'
-                            : 'bg-[#F2E5D5] text-[#8C6239]'
-                        }`}
-                      >
-                        {tab.count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {/* Visual gradient fade mask on right edge of scrollable tab container */}
-            <div className="absolute right-0 top-0 bottom-1.5 w-8 sm:w-12 pointer-events-none bg-gradient-to-l from-[#FDFBF7] to-transparent" />
-          </div>
-
-          {/* Urgent Alert Ribbon: Peringatan jika ada kartu / tagihan mendekati tempo atau expired */}
-          <UrgentAlertRibbon
-            items={items}
-            onSelectUrgentFilter={() =>
-              setCompartmentFilter((prev) => (prev === 'urgent' ? 'all' : 'urgent'))
-            }
-            isCurrentFilterUrgent={compartmentFilter === 'urgent'}
-          />
-
-          {/* Error Alert */}
-          {error && (
-            <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between">
-              <span>{error}</span>
-              <button
-                onClick={loadItems}
-                className="text-xs font-semibold underline hover:text-rose-900 cursor-pointer"
+          {/* View 1: Clean & Minimal Dashboard */}
+          {currentView === 'dashboard' && (
+            <div className="space-y-6">
+              {/* Clean Minimal Woodcraft Header Plaque (Free of messy category tabs & access pills) */}
+              <div
+                className="w-full px-5 py-4 sm:py-5 rounded-2xl border border-[#B48248]/60 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, #2D1A0E 0%, #3F2413 50%, #241308 100%)',
+                }}
               >
-                Coba Lagi
-              </button>
-            </div>
-          )}
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FFE3B3]/70 to-transparent pointer-events-none" />
 
-          {/* Loading Skeleton */}
-          {loading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {[1, 2, 3, 4, 5, 6].map((idx) => (
-                <div
-                  key={idx}
-                  className="h-44 rounded-2xl bg-[#FFFFFF] border border-[#EBE3D5] p-5 flex flex-col justify-between animate-pulse"
-                >
-                  <div className="space-y-2.5">
-                    <div className="h-4 bg-[#F5EFEB] rounded-md w-3/4" />
-                    <div className="h-3 bg-[#F5EFEB] rounded-md w-1/2" />
-                    <div className="h-10 bg-[#FAF4ED] rounded-xl w-full mt-2" />
+                <div className="flex items-center gap-3 relative z-10">
+                  <div className="w-3 h-3 rounded-full bg-[#FFDF80] shadow-[0_0_10px_rgba(255,223,128,0.9)]" />
+                  <div>
+                    <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-[#FAF8F5] leading-tight">
+                      Brankas Utama Vaultra
+                    </h1>
+                    <span className="text-xs text-[#D4A373] font-medium block">
+                      Penyimpanan Bersih, Tenang, &amp; Terorganisir
+                    </span>
                   </div>
-                  <div className="h-3 bg-[#F5EFEB] rounded-md w-2/3 pt-2" />
                 </div>
-              ))}
+
+                <div className="flex items-center gap-3 relative z-10">
+                  <span className="px-3 py-1 rounded-xl bg-[#1C1008]/80 border border-[#B48248]/40 text-xs font-mono font-bold text-[#FFE3B3]">
+                    {items.length} Kompartemen Aktif
+                  </span>
+                  {urgentCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleNavigateView('calendar')}
+                      className="px-2.5 py-1 rounded-xl bg-rose-950/80 border border-rose-500/50 text-xs font-bold text-rose-300 hover:bg-rose-900 transition-colors duration-100 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                      <span>{urgentCount} Perlu Perhatian</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Clean Search Input (STRICT Form Input Anti-Lag: transition-colors duration-100) */}
+              <div className="relative w-full">
+                <Search className="w-4 h-4 text-[#8C6239] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Cari cepat judul dokumen, nama kartu, atau kata kunci brankas..."
+                  className="w-full pl-10 pr-10 py-2.5 rounded-xl border border-[#DEC8B0] bg-[#FFFFFF] text-xs sm:text-sm text-[#261C14] placeholder-[#8A7563] focus:outline-none focus:border-[#B48248] focus:ring-1 focus:ring-[#B48248] shadow-xs transition-colors duration-100"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8C6239] hover:text-[#261C14] cursor-pointer"
+                    aria-label="Bersihkan pencarian"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Subtle Urgent Alert Ribbon if any urgent items exist and no search */}
+              {!searchQuery && urgentCount > 0 && (
+                <UrgentAlertRibbon
+                  items={items}
+                  onSelectUrgentFilter={() => handleNavigateView('calendar')}
+                  isCurrentFilterUrgent={false}
+                />
+              )}
+
+              {/* Error Alert */}
+              {error && (
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between">
+                  <span>{error}</span>
+                  <button
+                    onClick={loadItems}
+                    className="text-xs font-semibold underline hover:text-rose-900 cursor-pointer"
+                  >
+                    Coba Lagi
+                  </button>
+                </div>
+              )}
+
+              {/* Loading Skeleton */}
+              {loading && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {[1, 2, 3, 4, 5, 6].map((idx) => (
+                    <div
+                      key={idx}
+                      className="h-44 rounded-2xl bg-[#FFFFFF] border border-[#EBE3D5] p-5 flex flex-col justify-between animate-pulse"
+                    >
+                      <div className="space-y-2.5">
+                        <div className="h-4 bg-[#F5EFEB] rounded-md w-3/4" />
+                        <div className="h-3 bg-[#F5EFEB] rounded-md w-1/2" />
+                        <div className="h-10 bg-[#FAF4ED] rounded-xl w-full mt-2" />
+                      </div>
+                      <div className="h-3 bg-[#F5EFEB] rounded-md w-2/3 pt-2" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!loading && !error && cleanDashboardItems.length === 0 && (
+                <div className="text-center py-12 px-4 rounded-2xl bg-white border border-[#E5DACB] space-y-3">
+                  <Sparkles className="w-10 h-10 mx-auto text-[#DEC8B0]" />
+                  <h3 className="text-base font-extrabold text-[#261C14]">
+                    {searchQuery ? 'Tidak Ada Kompartemen yang Cocok' : 'Brankas Masih Kosong'}
+                  </h3>
+                  <p className="text-xs text-[#786858] max-w-sm mx-auto">
+                    {searchQuery
+                      ? `Tidak ditemukan item yang mengandung kata kunci "${searchQuery}". Coba kata kunci lain.`
+                      : 'Mulai simpan tautan penting, nomor kartu, dokumen, tagihan, atau kredensial rahasia ke dalam brankas.'}
+                  </p>
+                  {searchQuery ? (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="text-xs font-bold text-[#8C6239] underline cursor-pointer"
+                    >
+                      Hapus Kata Kunci
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleOpenAddModal}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-[#E5B57A] text-[#24140B] border border-[#B48248] cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Tambah Item Baru</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Clean Items Grid */}
+              {!loading && !error && cleanDashboardItems.length > 0 && (
+                <section>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {cleanDashboardItems.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        isPrivacyMode={isPrivacyMode}
+                        onClick={(clickedItem) => setSelectedItemForPopup(clickedItem)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )}
             </div>
           )}
 
-          {/* Empty State */}
-          {!loading && !error && filteredItems.length === 0 && (
-            <EmptyState
-              filter={compartmentFilter}
-              onResetFilter={() => setCompartmentFilter('all')}
-              onOpenAddModal={handleOpenAddModal}
-              compartmentName={
-                compartmentFilter === 'all'
-                  ? null
-                  : compartmentTabs.find((t) => t.id === compartmentFilter)?.label
-              }
+          {/* View 2: Kalender & Linimasa Brankas */}
+          {currentView === 'calendar' && (
+            <CalendarPage
+              items={items}
+              onSelectItem={(item) => setSelectedItemForPopup(item)}
             />
           )}
 
-          {/* Items Grid */}
-          {!loading && !error && filteredItems.length > 0 && (
-            <section>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {filteredItems.map((item) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    isPrivacyMode={isPrivacyMode}
-                    onClick={(clickedItem) => setSelectedItemForPopup(clickedItem)}
-                  />
-                ))}
-              </div>
-            </section>
+          {/* View 3: Pusat Diagnostik & Skor Keamanan */}
+          {currentView === 'security' && (
+            <SecurityPage
+              items={items}
+              onSelectItem={(item) => setSelectedItemForPopup(item)}
+            />
+          )}
+
+          {/* View 4: Intelijen Tagihan & Langganan */}
+          {currentView === 'bills' && (
+            <BillsPage
+              items={items}
+              onUpdateItem={handleSaveItem}
+              onSelectItem={(item) => setSelectedItemForPopup(item)}
+            />
+          )}
+
+          {/* View 5: Studio Cadangan & Enkripsi */}
+          {currentView === 'backup' && (
+            <BackupPage
+              items={items}
+              currentUser={currentUser}
+              onRestoreItems={handleRestoreItems}
+              showToast={showToast}
+            />
+          )}
+
+          {/* View 6: Protokol Darurat SOS & Warisan Digital */}
+          {currentView === 'emergency' && (
+            <EmergencyPage
+              onPanicLockdown={handlePanicLockdown}
+              showToast={showToast}
+            />
           )}
         </main>
 
