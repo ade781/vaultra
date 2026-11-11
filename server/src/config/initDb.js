@@ -46,6 +46,27 @@ async function ensureTablesExist() {
       ALTER TABLE "Item" ALTER COLUMN "url" DROP NOT NULL;
     `);
 
+    // 2c. Safe index creation for performance & scalability
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS idx_item_created_at ON "Item"("createdAt" DESC);
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS idx_item_type ON "Item"("type");
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS idx_item_is_private ON "Item"("isPrivate");
+    `);
+    try {
+      await prisma.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS idx_item_metadata_gin ON "Item" USING gin (metadata);
+      `);
+    } catch (ginErr) {
+      console.warn('GIN index creation warning:', ginErr.message);
+    }
+    await prisma.$executeRawUnsafe(`
+      CREATE INDEX IF NOT EXISTS idx_user_role ON "User"("role");
+    `);
+
     // 3. Ensure seed admin exists
     const adminCount = await prisma.user.count({ where: { role: 'admin' } });
     if (adminCount === 0) {

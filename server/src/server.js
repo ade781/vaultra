@@ -1,27 +1,41 @@
-// Guaranteed environment defaults for Supabase Cloud
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://postgres.bnkvuniwxgqmxxaoodyh:Adeasli781781@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1';
-}
-if (!process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = 'vaultra_jwt_secret_wood_key_2026';
-}
-
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-// Load environment files: .env.{NODE_ENV} first, then .env
+// Load environment files: .env first, then specific .env.{NODE_ENV}
 const nodeEnv = process.env.NODE_ENV || 'development';
-dotenv.config({ path: path.resolve(__dirname, `../.env.${nodeEnv}`) });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, `../.env.${nodeEnv}`) });
 dotenv.config();
+
+// Fail-fast validation for critical environment configuration
+const databaseUrl =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL;
+
+if (!databaseUrl) {
+  const errMsg = 'CRITICAL: DATABASE_URL is not defined in environment variables. Please check your .env file.';
+  console.error(errMsg);
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(errMsg);
+  }
+} else if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = databaseUrl;
+}
+
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'vaultra_jwt_secret_wood_key_2026';
+}
 
 const itemRoutes = require('./routes/itemRoutes');
 const authRoutes = require('./routes/authRoutes');
+const backupRoutes = require('./routes/backupRoutes');
 const errorHandler = require('./middlewares/errorHandler');
 const { ensureTablesExist } = require('./config/initDb');
-ensureTablesExist().catch(err => console.error('Table init:', err.message));
+
+ensureTablesExist().catch((err) => console.error('Table init:', err.message));
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -80,6 +94,7 @@ app.get('/api/health', (req, res) => {
 // Mount Resource Routes
 app.use('/api/items', itemRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/backup', backupRoutes);
 
 // 404 Handler
 app.use((req, res) => {

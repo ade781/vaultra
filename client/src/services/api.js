@@ -40,7 +40,18 @@ apiClient.interceptors.response.use(
       error.response?.data?.message ||
       error.message ||
       'Terjadi kesalahan pada server';
-    return Promise.reject(new Error(message));
+
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vaultra:unauthorized'));
+      }
+    }
+
+    const enhancedError = new Error(message);
+    enhancedError.normalizedMessage = message;
+    enhancedError.status = error.response?.status;
+    enhancedError.response = error.response;
+    return Promise.reject(enhancedError);
   }
 );
 
@@ -90,6 +101,67 @@ export async function getMe() {
 
 export async function getUsers() {
   return apiClient.get('/auth/users');
+}
+
+// Backup & Restore API
+export async function exportBackup() {
+  let backupData;
+  try {
+    const res = await apiClient.get('/backup/export');
+    backupData = res;
+  } catch {
+    const items = await getItems();
+    const itemList = Array.isArray(items) ? items : [];
+    backupData = {
+      vaultraVersion: '1.0.0',
+      exportedAt: new Date().toISOString(),
+      itemCount: itemList.length,
+      items: itemList,
+    };
+  }
+
+  const itemList = Array.isArray(backupData) ? backupData : (backupData?.items || []);
+  const normalizedBackup = {
+    vaultraVersion: backupData?.vaultraVersion || '1.0.0',
+    exportedAt: backupData?.exportedAt || new Date().toISOString(),
+    totalItems: backupData?.itemCount !== undefined ? backupData.itemCount : itemList.length,
+    items: itemList,
+  };
+
+  if (typeof document !== 'undefined') {
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+      JSON.stringify(normalizedBackup, null, 2)
+    )}`;
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', jsonString);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadAnchor.setAttribute('download', `vaultra-backup-${dateStr}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  }
+
+  return normalizedBackup;
+}
+
+export async function restoreBackup(jsonData) {
+  try {
+    return await apiClient.post('/backup/restore', jsonData);
+  } catch {
+    const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
+    const itemsToRestore = Array.isArray(data) ? data : data?.items;
+    if (!Array.isArray(itemsToRestore)) {
+      throw new Error('Format berkas cadangan tidak valid: item tidak ditemukan');
+    }
+
+    const results = [];
+    for (const item of itemsToRestore) {
+      const { id, createdAt, updatedAt, ...payload } = item;
+      const created = await createItem(payload);
+      results.push(created);
+    }
+    return results;
+  }
 }
 
 export function logout() {

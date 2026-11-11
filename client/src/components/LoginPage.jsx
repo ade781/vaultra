@@ -1,52 +1,18 @@
-import React, { useState, startTransition } from 'react';
+import React, { useState, startTransition, useId, useRef, useEffect } from 'react';
 import { ArrowLeft, Lock, User, Eye, EyeOff, AlertCircle, ShieldAlert, CheckCircle2, UserPlus } from 'lucide-react';
 import VaultraLogo from './VaultraLogo';
 import PullCord from './PullCord';
 import * as api from '../services/api';
+import { playSwitchSound, playTumblerTick, triggerHaptic } from '../utils/soundHelper';
 import woodPlank6 from '../assets/wood-plank-6.jpg';
 import woodPlank2 from '../assets/wood-plank-2.jpg';
 
-// Shared singleton AudioContext to prevent synchronous main-thread blocking (Low INP)
-let sharedAudioCtx = null;
-
-function playSwitchSound(isOn) {
-  // Execute audio synthesis on requestAnimationFrame + microtask to ensure zero paint contention
-  requestAnimationFrame(() => {
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!sharedAudioCtx) {
-        sharedAudioCtx = new AudioCtx();
-      }
-      if (sharedAudioCtx.state === 'suspended') {
-        sharedAudioCtx.resume();
-      }
-
-      const ctx = sharedAudioCtx;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'triangle';
-      const startFreq = isOn ? 750 : 500;
-      const endFreq = isOn ? 350 : 200;
-
-      osc.frequency.setValueAtTime(startFreq, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(endFreq, ctx.currentTime + 0.04);
-
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.04);
-    } catch {
-      // Audio fallback
-    }
-  });
-}
-
 export default function LoginPage({ onBack, onLoginSuccess }) {
+  const ade7GoldId = useId();
+  const ade7LineId = useId();
+  const ade7GlowId = useId();
+  const usernameInputRef = useRef(null);
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -64,6 +30,16 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
   const [newAdminConfirmPassword, setNewAdminConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
 
+  // Autofocus ke input username saat lampu dinyalakan
+  useEffect(() => {
+    if (isLampOn) {
+      const timer = setTimeout(() => {
+        usernameInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isLampOn]);
+
   const toggleLamp = () => {
     playSwitchSound(!isLampOn);
     startTransition(() => {
@@ -77,10 +53,12 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
     setError('');
 
     if (!username.trim()) {
+      triggerHaptic([40]);
       setError('Username wajib diisi');
       return;
     }
     if (!password.trim()) {
+      triggerHaptic([40]);
       setError('Password wajib diisi');
       return;
     }
@@ -91,6 +69,8 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
         username: username.trim(),
         password: password.trim(),
       });
+
+      triggerHaptic([20, 30]);
 
       if (res.user?.isInitial && res.user?.role === 'admin') {
         startTransition(() => {
@@ -104,6 +84,7 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
         onLoginSuccess(res.user);
       }
     } catch (err) {
+      triggerHaptic([50, 50]);
       setError(err.message || 'Login gagal. Periksa username dan password.');
     } finally {
       setLoading(false);
@@ -116,18 +97,22 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
     setError('');
 
     if (!newAdminUsername.trim()) {
+      triggerHaptic([40]);
       setError('Username admin baru wajib diisi');
       return;
     }
     if (newAdminUsername.trim().toLowerCase() === 'admin') {
+      triggerHaptic([40]);
       setError('Gunakan username selain "admin" untuk admin permanen baru Anda');
       return;
     }
     if (!newAdminPassword || newAdminPassword.length < 6) {
+      triggerHaptic([40]);
       setError('Password admin baru minimal 6 karakter');
       return;
     }
     if (newAdminPassword !== newAdminConfirmPassword) {
+      triggerHaptic([40]);
       setError('Konfirmasi password tidak cocok');
       return;
     }
@@ -140,10 +125,13 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
         newPassword: newAdminPassword.trim(),
       });
 
+      triggerHaptic([25, 40]);
+
       if (onLoginSuccess) {
         onLoginSuccess(res.user);
       }
     } catch (err) {
+      triggerHaptic([50, 50]);
       setError(err.message || 'Gagal membuat admin baru.');
     } finally {
       setLoading(false);
@@ -151,6 +139,7 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
   };
 
   const handleCancelSetupAdmin = () => {
+    playTumblerTick();
     api.logout();
     startTransition(() => {
       setIsSetupAdminStep(false);
@@ -350,7 +339,7 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
         {/* SEBELAH KANAN: Login Card Muncul dengan Fade Biasa (Tanpa Pop up bawah) */}
         {/* ========================================================================= */}
         <div 
-          className={`w-full max-w-[440px] rounded-3xl p-5 sm:p-7 md:p-9 transition-opacity duration-400 ease-in-out relative overflow-hidden backdrop-blur-md border border-[#B48248]/60 will-change-[opacity] ${
+          className={`w-full max-w-[440px] rounded-3xl p-5 sm:p-7 md:p-9 transition-opacity duration-400 ease-in-out relative overflow-hidden border border-[#B48248]/60 will-change-[opacity] ${
             isLampOn
               ? 'opacity-100 pointer-events-auto border-l-[#FFCC00] shadow-[0_25px_60px_-10px_rgba(0,0,0,0.95),-15px_0_35px_-5px_rgba(255,190,0,0.35)]'
               : 'opacity-0 pointer-events-none shadow-none'
@@ -423,10 +412,14 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                     <input
                       type="text"
                       required
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck="false"
+                      autoComplete="username"
                       value={newAdminUsername}
                       onChange={(e) => setNewAdminUsername(e.target.value)}
                       placeholder="Contoh: ade7 atau superadmin"
-                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-colors duration-100 shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
                     />
                   </div>
                 </div>
@@ -437,10 +430,11 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                   </label>
                   <input
                     type="text"
+                    autoComplete="name"
                     value={newAdminName}
                     onChange={(e) => setNewAdminName(e.target.value)}
                     placeholder="Contoh: Ade Pratama"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-colors duration-100 shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
                   />
                 </div>
 
@@ -456,14 +450,18 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                       type={showNewPassword ? 'text' : 'password'}
                       required
                       minLength={6}
+                      autoComplete="new-password"
                       value={newAdminPassword}
                       onChange={(e) => setNewAdminPassword(e.target.value)}
                       placeholder="Password baru"
-                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-colors duration-100 shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
                     />
                     <button
                       type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      onClick={() => {
+                        playTumblerTick();
+                        setShowNewPassword(!showNewPassword);
+                      }}
                       className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9E826A] hover:text-[#FAF8F5] cursor-pointer"
                     >
                       {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -479,11 +477,27 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                     type={showNewPassword ? 'text' : 'password'}
                     required
                     minLength={6}
+                    autoComplete="new-password"
                     value={newAdminConfirmPassword}
                     onChange={(e) => setNewAdminConfirmPassword(e.target.value)}
                     placeholder="Ulangi password baru"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-colors duration-100 shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
                   />
+                  {newAdminConfirmPassword.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-1.5 text-[11px] transition-colors duration-100">
+                      {newAdminPassword === newAdminConfirmPassword && newAdminPassword.length >= 6 ? (
+                        <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>Password cocok & memenuhi syarat</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-amber-300/80 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>Password belum cocok</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -527,12 +541,17 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                     <User className="w-4 h-4" />
                   </div>
                   <input
+                    ref={usernameInputRef}
                     type="text"
                     required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                    autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Username"
-                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-colors duration-100 shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
                   />
                 </div>
 
@@ -543,14 +562,18 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Password"
-                    className="w-full pl-11 pr-11 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-all shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
+                    className="w-full pl-11 pr-11 py-3 rounded-2xl bg-[#120B07]/90 border border-[#4A2E1B] text-sm text-[#FAF8F5] placeholder-[#8A7563] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/50 focus:border-[#FFCC00] transition-colors duration-100 shadow-[inset_0_2px_5px_rgba(0,0,0,0.7)]"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    onClick={() => {
+                      playTumblerTick();
+                      setShowPassword(!showPassword);
+                    }}
                     className="absolute inset-y-0 right-0 pr-4 flex items-center text-[#9E826A] hover:text-[#FAF8F5] cursor-pointer touch-manipulation"
                     aria-label="Lihat password"
                   >
@@ -568,7 +591,10 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
 
                 <button
                   type="button"
-                  onClick={onBack}
+                  onClick={() => {
+                    playTumblerTick();
+                    if (onBack) onBack();
+                  }}
                   disabled={loading}
                   className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-2xl text-xs font-semibold text-[#D7C4B0] hover:text-[#FAF8F5] bg-[#140C07]/60 hover:bg-[#140C07] border border-[#4A2E1B]/60 transition-all cursor-pointer touch-manipulation"
                 >
@@ -585,25 +611,25 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                     aria-label="Made By Ade7"
                   >
                     <defs>
-                      <linearGradient id="ade7Gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <linearGradient id={ade7GoldId} x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#FFE5B4" />
                         <stop offset="50%" stopColor="#E5B57A" />
                         <stop offset="100%" stopColor="#FFCC00" />
                       </linearGradient>
-                      <linearGradient id="ade7Line" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <linearGradient id={ade7LineId} x1="0%" y1="0%" x2="100%" y2="0%">
                         <stop offset="0%" stopColor="#B48248" stopOpacity="0" />
                         <stop offset="50%" stopColor="#FFCC00" stopOpacity="0.85" />
                         <stop offset="100%" stopColor="#B48248" stopOpacity="0" />
                       </linearGradient>
-                      <filter id="ade7Glow" x="-20%" y="-20%" width="140%" height="140%">
+                      <filter id={ade7GlowId} x="-20%" y="-20%" width="140%" height="140%">
                         <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="#FFCC00" floodOpacity="0.45" />
                       </filter>
                     </defs>
 
-                    <line x1="10" y1="16" x2="48" y2="16" stroke="url(#ade7Line)" strokeWidth="1.2" strokeLinecap="round" />
+                    <line x1="10" y1="16" x2="48" y2="16" stroke={`url(#${ade7LineId})`} strokeWidth="1.2" strokeLinecap="round" />
                     <polygon points="53,16 56,13 59,16 56,19" fill="#FFCC00" opacity="0.9" />
 
-                    <g filter="url(#ade7Glow)">
+                    <g filter={`url(#${ade7GlowId})`}>
                       <text 
                         x="110" 
                         y="20" 
@@ -612,14 +638,14 @@ export default function LoginPage({ onBack, onLoginSuccess }) {
                         fontWeight="800" 
                         letterSpacing="3.2" 
                         textAnchor="middle" 
-                        fill="url(#ade7Gold)"
+                        fill={`url(#${ade7GoldId})`}
                       >
                         MADE BY ADE7
                       </text>
                     </g>
 
                     <polygon points="161,16 164,13 167,16 164,19" fill="#FFCC00" opacity="0.9" />
-                    <line x1="172" y1="16" x2="210" y2="16" stroke="url(#ade7Line)" strokeWidth="1.2" strokeLinecap="round" />
+                    <line x1="172" y1="16" x2="210" y2="16" stroke={`url(#${ade7LineId})`} strokeWidth="1.2" strokeLinecap="round" />
                   </svg>
                 </div>
 

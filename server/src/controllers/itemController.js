@@ -48,8 +48,16 @@ function validateAndSanitizeCards(cards) {
     if (!card || typeof card !== 'object') {
       return { error: `Data kartu ke-${i + 1} tidak valid` };
     }
-    const last4 = card.last4 !== undefined && card.last4 !== null ? String(card.last4).trim() : '';
-    if (!last4) {
+
+    // Dukung kedua format key last4 DAN lastDigits
+    const rawDigits =
+      card.lastDigits !== undefined && card.lastDigits !== null && String(card.lastDigits).trim()
+        ? String(card.lastDigits).trim()
+        : card.last4 !== undefined && card.last4 !== null
+        ? String(card.last4).trim()
+        : '';
+
+    if (!rawDigits) {
       return { error: `Kartu ke-${i + 1} harus memiliki 4 digit terakhir` };
     }
     const expiryDate = card.expiryDate !== undefined && card.expiryDate !== null ? String(card.expiryDate).trim() : '';
@@ -57,10 +65,15 @@ function validateAndSanitizeCards(cards) {
       return { error: `Kartu ke-${i + 1} harus memiliki tanggal kedaluwarsa` };
     }
 
+    const digits = rawDigits.slice(-4);
     sanitized.push({
-      id: card.id !== undefined && card.id !== null && String(card.id).trim() ? String(card.id).trim() : `card_${Date.now()}_${i}`,
+      id:
+        card.id !== undefined && card.id !== null && String(card.id).trim()
+          ? String(card.id).trim()
+          : `card_${Date.now()}_${i}`,
       label: card.label !== undefined && card.label !== null ? String(card.label).trim() : '',
-      last4: last4.slice(-4),
+      last4: digits,
+      lastDigits: digits,
       expiryDate: expiryDate,
     });
   }
@@ -70,7 +83,39 @@ function validateAndSanitizeCards(cards) {
 
 async function getItems(req, res, next) {
   try {
+    const authUser = getAuthenticatedUser(req);
+
+    let whereClause = {};
+
+    if (!authUser) {
+      // Guest: Hanya item publik
+      whereClause = { isPrivate: false };
+    } else if (authUser.role === 'admin') {
+      // Admin: Melihat seluruh item
+      whereClause = {};
+    } else {
+      // User login: Publik + privat milik user atau dishare ke user
+      const userIdentities = [authUser.username];
+      if (authUser.name && authUser.name.trim() && authUser.name !== authUser.username) {
+        userIdentities.push(authUser.name.trim());
+      }
+
+      whereClause = {
+        OR: [
+          { isPrivate: false },
+          {
+            isPrivate: true,
+            OR: [
+              { creator: { in: userIdentities } },
+              { sharedWith: authUser.username },
+            ],
+          },
+        ],
+      };
+    }
+
     const items = await prisma.item.findMany({
+      where: whereClause,
       orderBy: {
         createdAt: 'desc',
       },
@@ -91,8 +136,25 @@ async function getItemById(req, res, next) {
       where: { id },
     });
     if (!item) {
-      return res.status(404).json({ error: 'Link tidak ditemukan' });
+      return res.status(404).json({ error: 'Kompartemen tidak ditemukan' });
     }
+
+    if (item.isPrivate) {
+      const authUser = getAuthenticatedUser(req);
+      if (!authUser) {
+        return res.status(403).json({ error: 'Kompartemen ini bersifat privat' });
+      }
+      const isAdmin = authUser.role === 'admin';
+      const isOwnerOrShared =
+        item.creator === authUser.username ||
+        (authUser.name && item.creator === authUser.name) ||
+        item.sharedWith === authUser.username;
+
+      if (!isAdmin && !isOwnerOrShared) {
+        return res.status(403).json({ error: 'Akses ditolak ke kompartemen privat ini' });
+      }
+    }
+
     return res.json(item);
   } catch (error) {
     next(error);
@@ -104,7 +166,7 @@ async function createItem(req, res, next) {
     const { type, title, url, metadata, creator, sourceEmail, isPrivate, sharedWith } = req.body;
 
     if (!title || typeof title !== 'string' || !title.trim()) {
-      return res.status(400).json({ error: 'Judul link wajib diisi' });
+      return res.status(400).json({ error: 'Judul kompartemen wajib diisi' });
     }
 
     // Tipe item (default 'link')
@@ -121,7 +183,7 @@ async function createItem(req, res, next) {
     let finalUrl = null;
     if (itemType === 'link') {
       if (!url || typeof url !== 'string' || !url.trim()) {
-        return res.status(400).json({ error: 'Link URL wajib diisi' });
+        return res.status(400).json({ error: 'URL kompartemen wajib diisi' });
       }
       finalUrl = url.trim();
     } else {
@@ -190,7 +252,19 @@ async function updateItem(req, res, next) {
 
     const existingItem = await prisma.item.findUnique({ where: { id } });
     if (!existingItem) {
-      return res.status(404).json({ error: 'Link tidak ditemukan' });
+      return res.status(404).json({ error: 'Kompartemen tidak ditemukan' });
+    }
+
+    const authUser = getAuthenticatedUser(req);
+    const isAdmin = authUser && authUser.role === 'admin';
+    const isOwner =
+      authUser &&
+      (existingItem.creator === authUser.username || (authUser.name && existingItem.creator === authUser.name));
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        error: 'Akses ditolak: Hanya pemilik kompartemen atau admin yang dapat mengubah item ini',
+      });
     }
 
     const { type, title, url, metadata, creator, sourceEmail, isPrivate, sharedWith } = req.body;
@@ -199,7 +273,7 @@ async function updateItem(req, res, next) {
     let finalTitle = existingItem.title;
     if (title !== undefined) {
       if (!title || typeof title !== 'string' || !title.trim()) {
-        return res.status(400).json({ error: 'Judul link wajib diisi' });
+        return res.status(400).json({ error: 'Judul kompartemen wajib diisi' });
       }
       finalTitle = title.trim();
     }
@@ -218,11 +292,11 @@ async function updateItem(req, res, next) {
     if (finalType === 'link') {
       if (url !== undefined) {
         if (!url || typeof url !== 'string' || !url.trim()) {
-          return res.status(400).json({ error: 'Link URL wajib diisi' });
+          return res.status(400).json({ error: 'URL kompartemen wajib diisi' });
         }
         finalUrl = url.trim();
       } else if (!finalUrl) {
-        return res.status(400).json({ error: 'Link URL wajib diisi untuk tipe link' });
+        return res.status(400).json({ error: 'URL kompartemen wajib diisi untuk tipe link' });
       }
     } else {
       if (url !== undefined) {
@@ -251,31 +325,26 @@ async function updateItem(req, res, next) {
     }
 
     // Creator logic
-    const authUser = getAuthenticatedUser(req);
     let finalCreator = existingItem.creator;
-
-    if (authUser) {
-      if (creator && typeof creator === 'string' && creator.trim()) {
-        finalCreator = creator.trim();
-      }
-    } else {
-      if (creator && typeof creator === 'string' && creator.trim()) {
-        finalCreator = creator.trim();
-      } else if (!finalCreator || finalCreator === 'Anonim') {
-        return res.status(400).json({ error: 'Nama pembuat wajib diisi' });
-      }
+    if (isAdmin && creator && typeof creator === 'string' && creator.trim()) {
+      finalCreator = creator.trim();
     }
 
     const finalIsPrivate = isPrivate !== undefined ? Boolean(isPrivate) : existingItem.isPrivate;
     const finalSharedWith = finalIsPrivate
-      ? (sharedWith !== undefined
-          ? (sharedWith && typeof sharedWith === 'string' && sharedWith.trim() ? sharedWith.trim() : null)
-          : existingItem.sharedWith)
+      ? sharedWith !== undefined
+        ? sharedWith && typeof sharedWith === 'string' && sharedWith.trim()
+          ? sharedWith.trim()
+          : null
+        : existingItem.sharedWith
       : null;
 
-    const finalSourceEmail = sourceEmail !== undefined
-      ? (sourceEmail && typeof sourceEmail === 'string' && sourceEmail.trim() ? sourceEmail.trim() : null)
-      : existingItem.sourceEmail;
+    const finalSourceEmail =
+      sourceEmail !== undefined
+        ? sourceEmail && typeof sourceEmail === 'string' && sourceEmail.trim()
+          ? sourceEmail.trim()
+          : null
+        : existingItem.sourceEmail;
 
     const item = await prisma.item.update({
       where: { id },
@@ -304,11 +373,31 @@ async function deleteItem(req, res, next) {
       return res.status(400).json({ error: 'ID tidak valid' });
     }
 
+    const existingItem = await prisma.item.findUnique({
+      where: { id },
+    });
+
+    if (!existingItem) {
+      return res.status(404).json({ error: 'Kompartemen tidak ditemukan' });
+    }
+
+    const authUser = getAuthenticatedUser(req);
+    const isAdmin = authUser && authUser.role === 'admin';
+    const isOwner =
+      authUser &&
+      (existingItem.creator === authUser.username || (authUser.name && existingItem.creator === authUser.name));
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({
+        error: 'Akses ditolak: Hanya pemilik kompartemen atau admin yang dapat menghapus item ini',
+      });
+    }
+
     await prisma.item.delete({
       where: { id },
     });
 
-    return res.json({ success: true, message: 'Link berhasil dihapus' });
+    return res.json({ success: true, message: 'Kompartemen berhasil dihapus' });
   } catch (error) {
     next(error);
   }

@@ -1,9 +1,12 @@
 // Vercel Serverless Function entry point
+const path = require('path');
+const dotenv = require('dotenv');
+
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://postgres.bnkvuniwxgqmxxaoodyh:Adeasli781781@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1';
-}
-if (!process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = 'vaultra_jwt_secret_wood_key_2026';
+  const nodeEnv = process.env.NODE_ENV || 'production';
+  dotenv.config({ path: path.resolve(__dirname, `../server/.env.${nodeEnv}`) });
+  dotenv.config({ path: path.resolve(__dirname, '../server/.env') });
+  dotenv.config();
 }
 
 const app = require('../server/src/server');

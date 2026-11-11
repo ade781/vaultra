@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, startTransition } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, startTransition } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
@@ -21,8 +21,7 @@ import {
   Link as LinkIcon,
   LayoutGrid,
   Clock,
-  Shield,
-  ShieldCheck,
+  Plus,
 } from 'lucide-react';
 
 export default function App() {
@@ -53,9 +52,29 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [selectedItemForPopup, setSelectedItemForPopup] = useState(null);
-  const [toastMessage, setToastMessage] = useState('');
 
-  // 1. Check Initial Auth
+  // Toast Notification State (supports type: 'success' | 'error')
+  const [toast, setToast] = useState({ message: '', type: 'success' });
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+  }, []);
+
+  // 1. Fetch items
+  const loadItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await api.getItems();
+      setItems(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching items:', err);
+      setError('Gagal memuat item dari server. Pastikan backend server berjalan.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 2. Check Initial Auth
   useEffect(() => {
     const savedUser = api.getCurrentUser();
     if (savedUser) {
@@ -74,26 +93,23 @@ export default function App() {
           setCurrentUser(null);
         });
     }
-  }, []);
-
-  // 2. Fetch items
-  const loadItems = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await api.getItems();
-      setItems(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Error fetching items:', err);
-      setError('Gagal memuat item dari server. Pastikan backend server berjalan.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
     loadItems();
   }, [loadItems]);
+
+  // 3. Listen to 401 unauthorized session expiry
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      api.logout();
+      startTransition(() => {
+        setCurrentUser(null);
+      });
+      showToast('Sesi login telah berakhir. Silakan masuk kembali.', 'error');
+      loadItems();
+    };
+
+    window.addEventListener('vaultra:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('vaultra:unauthorized', handleUnauthorized);
+  }, [loadItems, showToast]);
 
   // Non-blocking Concurrent View Navigators
   const handleNavigateLogin = () => {
@@ -115,7 +131,8 @@ export default function App() {
       setCurrentView('dashboard');
     });
     const roleText = user.role === 'admin' ? 'Administrator' : 'Pengguna';
-    setToastMessage(`Selamat datang, ${user.name || user.username} (${roleText})!`);
+    showToast(`Selamat datang, ${user.name || user.username} (${roleText})!`, 'success');
+    loadItems();
   };
 
   const handleLogout = () => {
@@ -123,7 +140,9 @@ export default function App() {
     startTransition(() => {
       setCurrentUser(null);
     });
-    setToastMessage('Anda telah keluar dari akun');
+    setItems([]);
+    showToast('Anda telah keluar dari akun', 'success');
+    loadItems();
   };
 
   // Open Add Modal
@@ -145,14 +164,15 @@ export default function App() {
       if (id) {
         const updated = await api.updateItem(id, formData);
         setItems((prev) => prev.map((it) => (it.id === id ? updated : it)));
-        setToastMessage('Kompartemen brankas berhasil diperbarui');
+        showToast('Kompartemen brankas berhasil diperbarui', 'success');
       } else {
         const newItem = await api.createItem(formData);
         setItems((prev) => [newItem, ...prev]);
-        setToastMessage('Item berhasil ditambahkan ke brankas');
+        showToast('Item berhasil ditambahkan ke brankas', 'success');
       }
     } catch (err) {
-      throw new Error(err.message || 'Gagal menyimpan ke brankas');
+      showToast(err.message || 'Gagal menyimpan ke brankas', 'error');
+      throw err;
     }
   };
 
@@ -161,58 +181,116 @@ export default function App() {
     try {
       await api.deleteItem(id);
       setItems((prev) => prev.filter((it) => it.id !== id));
-      setToastMessage('Item berhasil dihapus dari brankas');
+      showToast('Item berhasil dihapus dari brankas', 'success');
     } catch (err) {
-      throw new Error(err.message || 'Gagal menghapus item');
+      showToast(err.message || 'Gagal menghapus item', 'error');
+      throw err;
     }
   };
 
   // Handle Item Updated directly from Quick Extend in Detail Modal
   const handleItemUpdated = (updated) => {
     setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
-    setToastMessage('Masa aktif berhasil diperpanjang!');
+    showToast('Masa aktif berhasil diperpanjang!', 'success');
   };
 
-  // Filter items
-  const filteredItems = items.filter((item) => {
-    // 1. Access Filter
-    if (accessFilter === 'public' && item.isPrivate) return false;
-    if (accessFilter === 'private' && !item.isPrivate) return false;
-
-    // 2. Compartment Filter
-    if (compartmentFilter === 'all') return true;
-    if (compartmentFilter === 'urgent') {
-      return getItemUrgency(item).isUrgent;
+  // Handle Export Backup JSON
+  const handleExportBackup = async () => {
+    try {
+      const backup = await api.exportBackup();
+      showToast(`Cadangan brankas berhasil diunduh (${backup.totalItems} item)`, 'success');
+    } catch (err) {
+      showToast(err.message || 'Gagal mengunduh cadangan data', 'error');
     }
-    const itemType = item.type || 'link';
-    return itemType === compartmentFilter;
-  });
+  };
 
-  // Calculate counts for badges
-  const urgentCount = items.filter((it) => getItemUrgency(it).isUrgent).length;
-  const linkCount = items.filter((it) => (it.type || 'link') === 'link').length;
-  const cardCount = items.filter((it) => it.type === 'card_reminder').length;
-  const docCount = items.filter((it) => it.type === 'document').length;
-  const billCount = items.filter((it) => it.type === 'bill').length;
-  const credCount = items.filter((it) => it.type === 'credential').length;
-  const noteCount = items.filter((it) => it.type === 'note').length;
+  // Single-pass O(N) calculation for filtered items & badge counts
+  const { filteredItems, counts } = useMemo(() => {
+    let urgent = 0;
+    let link = 0;
+    let card = 0;
+    let doc = 0;
+    let bill = 0;
+    let cred = 0;
+    let note = 0;
+    let publicCount = 0;
+    let privateCount = 0;
+    const filtered = [];
 
-  const compartmentTabs = [
-    { id: 'all', label: 'Semua', icon: LayoutGrid, count: items.length },
-    { id: 'link', label: 'Tautan', icon: LinkIcon, count: linkCount },
-    { id: 'card_reminder', label: 'Kartu', icon: CreditCard, count: cardCount },
-    { id: 'document', label: 'Dokumen', icon: FileText, count: docCount },
-    { id: 'bill', label: 'Tagihan', icon: Receipt, count: billCount },
-    { id: 'credential', label: 'Kredensial', icon: Key, count: credCount },
-    { id: 'note', label: 'Catatan', icon: BookOpen, count: noteCount },
-    {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const isPriv = Boolean(item.isPrivate);
+      if (isPriv) privateCount++;
+      else publicCount++;
+
+      const type = item.type || 'link';
+      if (type === 'link') link++;
+      else if (type === 'card_reminder') card++;
+      else if (type === 'document') doc++;
+      else if (type === 'bill') bill++;
+      else if (type === 'credential') cred++;
+      else if (type === 'note') note++;
+
+      const urgency = getItemUrgency(item);
+      const isUrgent = urgency.isUrgent;
+      if (isUrgent) urgent++;
+
+      // Filter verification
+      if (accessFilter === 'public' && isPriv) continue;
+      if (accessFilter === 'private' && !isPriv) continue;
+
+      if (compartmentFilter === 'all') {
+        filtered.push(item);
+      } else if (compartmentFilter === 'urgent') {
+        if (isUrgent) filtered.push(item);
+      } else if (type === compartmentFilter) {
+        filtered.push(item);
+      }
+    }
+
+    return {
+      filteredItems: filtered,
+      counts: {
+        total: items.length,
+        urgent,
+        link,
+        card,
+        doc,
+        bill,
+        cred,
+        note,
+        publicCount,
+        privateCount,
+      },
+    };
+  }, [items, compartmentFilter, accessFilter]);
+
+  const compartmentTabs = useMemo(() => {
+    const urgentTab = {
       id: 'urgent',
       label: 'Urgent (≤ 7 Hari)',
       icon: Clock,
-      count: urgentCount,
+      count: counts.urgent,
       isSpecial: true,
-    },
-  ];
+    };
+
+    const standardTabs = [
+      { id: 'link', label: 'Tautan', icon: LinkIcon, count: counts.link },
+      { id: 'card_reminder', label: 'Kartu', icon: CreditCard, count: counts.card },
+      { id: 'document', label: 'Dokumen', icon: FileText, count: counts.doc },
+      { id: 'bill', label: 'Tagihan', icon: Receipt, count: counts.bill },
+      { id: 'credential', label: 'Kredensial', icon: Key, count: counts.cred },
+      { id: 'note', label: 'Catatan', icon: BookOpen, count: counts.note },
+    ];
+
+    const allTab = { id: 'all', label: 'Semua', icon: LayoutGrid, count: counts.total };
+
+    // Dynamic Tab Positioning: Move urgent tab to 2nd position (immediately after 'Semua') if urgentCount > 0
+    if (counts.urgent > 0) {
+      return [allTab, urgentTab, ...standardTabs];
+    }
+    return [allTab, ...standardTabs, urgentTab];
+  }, [counts]);
 
   // Render Login View if active
   if (currentView === 'login') {
@@ -245,18 +323,19 @@ export default function App() {
 
       {/* 2. Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 z-10">
-        {/* Sticky Top Navbar with Privacy Shield Toggle */}
+        {/* Sticky Top Navbar with Privacy Shield Toggle & Fast Backup Button */}
         <Navbar
           onOpenAddModal={handleOpenAddModal}
           onToggleSidebar={() => setIsSidebarMobileOpen(true)}
-          totalItems={items.length}
+          onBackup={handleExportBackup}
+          totalItems={counts.total}
           isPrivacyMode={isPrivacyMode}
           onTogglePrivacyMode={() => setIsPrivacyMode((prev) => !prev)}
         />
 
         {/* Content Body */}
         <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          {/* Top Woodcraft Plank Header with Integrated Access Filters & Privacy Indicator */}
+          {/* Top Woodcraft Plank Header with Integrated Access Filters, Backup Button & Privacy Indicator */}
           <div
             className="w-full mb-4 px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl border border-[#B48248]/60 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden"
             style={{
@@ -280,8 +359,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right: Access Filters (Semua | Publik | Private) + Privacy Shield Trigger */}
+            {/* Right: Access Filters (Semua | Publik | Private) */}
             <div className="flex items-center gap-2 flex-wrap relative z-10">
+              {/* Access Filter Pills */}
               <div className="inline-flex items-center p-1 rounded-xl bg-[#1C1008]/80 border border-[#B48248]/40 text-xs font-semibold shadow-inner">
                 <button
                   type="button"
@@ -292,7 +372,7 @@ export default function App() {
                       : 'text-[#D7C4B0] hover:text-[#FAF8F5]'
                   }`}
                 >
-                  Semua ({items.length})
+                  Semua ({counts.total})
                 </button>
                 <button
                   type="button"
@@ -304,7 +384,7 @@ export default function App() {
                   }`}
                 >
                   <Globe className="w-3 h-3" />
-                  <span>Publik ({items.filter((i) => !i.isPrivate).length})</span>
+                  <span>Publik ({counts.publicCount})</span>
                 </button>
                 <button
                   type="button"
@@ -316,88 +396,68 @@ export default function App() {
                   }`}
                 >
                   <Lock className="w-3 h-3" />
-                  <span>Private ({items.filter((i) => i.isPrivate).length})</span>
+                  <span>Private ({counts.privateCount})</span>
                 </button>
               </div>
-
-              {/* Privacy Shield Indicator Button */}
-              <button
-                type="button"
-                onClick={() => setIsPrivacyMode((prev) => !prev)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors duration-100 cursor-pointer shadow-xs ${
-                  isPrivacyMode
-                    ? 'bg-[#FFDF80] text-[#241208] border-[#FFE3B3] ring-1 ring-[#FFDF80]'
-                    : 'bg-[#1C1008]/70 text-[#D7C4B0] border-[#B48248]/40 hover:text-white'
-                }`}
-                title="Toggle Sensor Nomor Rahasia"
-              >
-                {isPrivacyMode ? (
-                  <>
-                    <ShieldCheck className="w-3.5 h-3.5 text-[#241208] stroke-[2.5]" />
-                    <span>Shield ON</span>
-                  </>
-                ) : (
-                  <>
-                    <Shield className="w-3.5 h-3.5 text-[#D4A373]" />
-                    <span>Sensor Mode</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
 
           {/* Horizontal Scrollable Compartment Category Tab Bar */}
-          <div className="w-full mb-6 overflow-x-auto pb-1.5 scrollbar-none">
-            <div className="flex items-center gap-2 min-w-max">
-              {compartmentTabs.map((tab) => {
-                const IconComp = tab.icon;
-                const isSelected = compartmentFilter === tab.id;
-                const isUrgentTab = tab.id === 'urgent';
+          <div className="relative w-full mb-6">
+            <div className="w-full overflow-x-auto pb-1.5 scrollbar-none">
+              <div className="flex items-center gap-2 min-w-max pr-8 sm:pr-0">
+                {compartmentTabs.map((tab) => {
+                  const IconComp = tab.icon;
+                  const isSelected = compartmentFilter === tab.id;
+                  const isUrgentTab = tab.id === 'urgent';
 
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setCompartmentFilter(tab.id)}
-                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors duration-100 cursor-pointer shrink-0 shadow-xs ${
-                      isSelected
-                        ? isUrgentTab
-                          ? 'bg-[#EF4444] text-white border-[#DC2626] ring-2 ring-[#FCA5A5]'
-                          : 'bg-[#2E1A0F] text-[#FFE3B3] border-[#D49132] ring-1 ring-[#D49132]'
-                        : isUrgentTab && tab.count > 0
-                        ? 'bg-[#FEF2F2] text-[#991B1B] border-[#FCA5A5] hover:bg-[#FEE2E2]'
-                        : 'bg-[#FFFFFF] text-[#664C35] border-[#E5DACB] hover:bg-[#F7EFE4] hover:text-[#261C14]'
-                    }`}
-                  >
-                    <IconComp
-                      className={`w-3.5 h-3.5 ${
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setCompartmentFilter(tab.id)}
+                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors duration-100 cursor-pointer shrink-0 shadow-xs ${
                         isSelected
                           ? isUrgentTab
-                            ? 'text-white'
-                            : 'text-[#FFDF80]'
+                            ? 'bg-[#EF4444] text-white border-[#DC2626] ring-2 ring-[#FCA5A5]'
+                            : 'bg-[#2E1A0F] text-[#FFE3B3] border-[#D49132] ring-1 ring-[#D49132]'
                           : isUrgentTab && tab.count > 0
-                          ? 'text-rose-600 animate-pulse'
-                          : 'text-[#8C6239]'
-                      }`}
-                    />
-                    <span>{tab.label}</span>
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                        isSelected
-                          ? isUrgentTab
-                            ? 'bg-white/20 text-white'
-                            : 'bg-[#D49132] text-[#241208]'
-                          : isUrgentTab && tab.count > 0
-                          ? 'bg-[#EF4444] text-white'
-                          : 'bg-[#F2E5D5] text-[#8C6239]'
+                          ? 'bg-[#FEF2F2] text-[#991B1B] border-[#FCA5A5] hover:bg-[#FEE2E2]'
+                          : 'bg-[#FFFFFF] text-[#664C35] border-[#E5DACB] hover:bg-[#F7EFE4] hover:text-[#261C14]'
                       }`}
                     >
-                      {tab.count}
-                    </span>
-                  </button>
-                );
-              })}
+                      <IconComp
+                        className={`w-3.5 h-3.5 ${
+                          isSelected
+                            ? isUrgentTab
+                              ? 'text-white'
+                              : 'text-[#FFDF80]'
+                            : isUrgentTab && tab.count > 0
+                            ? 'text-rose-600 animate-pulse'
+                            : 'text-[#8C6239]'
+                        }`}
+                      />
+                      <span>{tab.label}</span>
+                      <span
+                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                          isSelected
+                            ? isUrgentTab
+                              ? 'bg-white/20 text-white'
+                              : 'bg-[#D49132] text-[#241208]'
+                            : isUrgentTab && tab.count > 0
+                            ? 'bg-[#EF4444] text-white'
+                            : 'bg-[#F2E5D5] text-[#8C6239]'
+                        }`}
+                      >
+                        {tab.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            {/* Visual gradient fade mask on right edge of scrollable tab container */}
+            <div className="absolute right-0 top-0 bottom-1.5 w-8 sm:w-12 pointer-events-none bg-gradient-to-l from-[#FDFBF7] to-transparent" />
           </div>
 
           {/* Urgent Alert Ribbon: Peringatan jika ada kartu / tagihan mendekati tempo atau expired */}
@@ -444,6 +504,8 @@ export default function App() {
           {/* Empty State */}
           {!loading && !error && filteredItems.length === 0 && (
             <EmptyState
+              filter={compartmentFilter}
+              onResetFilter={() => setCompartmentFilter('all')}
               onOpenAddModal={handleOpenAddModal}
               compartmentName={
                 compartmentFilter === 'all'
@@ -486,6 +548,17 @@ export default function App() {
         </footer>
       </div>
 
+      {/* Mobile Floating Action Button (FAB) */}
+      <button
+        type="button"
+        onClick={handleOpenAddModal}
+        className="fixed bottom-6 right-5 z-30 sm:hidden w-13 h-13 rounded-full shadow-xl bg-gradient-to-br from-[#E5B57A] to-[#B48248] text-[#24140B] font-extrabold flex items-center justify-center border border-[#FFE3B3]/70 active:scale-95 transition-transform duration-100 cursor-pointer touch-manipulation"
+        title="Tambah Item"
+        aria-label="Tambah Item"
+      >
+        <Plus className="w-6 h-6 stroke-[2.8]" />
+      </button>
+
       {/* 3. Modal Form (Add & Edit) */}
       <ItemModal
         isOpen={isModalOpen}
@@ -507,10 +580,15 @@ export default function App() {
         onEdit={handleStartEdit}
         onDelete={handleDeleteItem}
         onItemUpdated={handleItemUpdated}
+        onError={(msg) => showToast(msg, 'error')}
       />
 
-      {/* 5. Toast Notification */}
-      <Toast message={toastMessage} onClose={() => setToastMessage('')} />
+      {/* 5. Toast Notification (Success & Error variants) */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ message: '', type: 'success' })}
+      />
     </div>
   );
 }

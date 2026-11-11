@@ -16,6 +16,8 @@ model User {
   role      String   @default("user")
   isInitial Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([role])
 }
 
 model Item {
@@ -30,4 +32,8 @@ model Item {
   sharedWith  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([createdAt(sort: Desc)])
+  @@index([type])
+  @@index([isPrivate])
 }

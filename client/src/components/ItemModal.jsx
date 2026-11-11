@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import VaultraLogo from './VaultraLogo';
 import * as api from '../services/api';
-import { getExpiryDetails } from '../utils/cardHelper';
+import { getExpiryDetails, addDaysOrYearsToDate, formatIDR } from '../utils/cardHelper';
 
 const COMPARTMENT_TYPES = [
   { id: 'link', label: 'Tautan Web', icon: LinkIcon, desc: 'URL, Google Drive, & tautan penting' },
@@ -32,11 +32,9 @@ const COMPARTMENT_TYPES = [
   { id: 'note', label: 'Catatan Rahasia', icon: BookOpen, desc: 'Catatan memo terenkripsi & privat' },
 ];
 
+// Clean 1-card default for new card reminder entries
 const DEFAULT_CARDS = [
   { id: '1', label: 'SIM 1 / Utama', lastDigits: '', expiryDate: '' },
-  { id: '2', label: 'SIM 2 / Cadangan', lastDigits: '', expiryDate: '' },
-  { id: '3', label: 'Kartu ATM / Debit', lastDigits: '', expiryDate: '' },
-  { id: '4', label: 'Kartu Kredit / e-Money', lastDigits: '', expiryDate: '' },
 ];
 
 export default function ItemModal({
@@ -89,6 +87,19 @@ export default function ItemModal({
   const [error, setError] = useState('');
 
   const inputRef = useRef(null);
+  const dialogRef = useRef(null);
+  const formRef = useRef(null);
+
+  // Body scroll lock while modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
 
   // Fetch available users from backend once when modal opens (not while typing)
   useEffect(() => {
@@ -217,6 +228,12 @@ export default function ItemModal({
 
   const isEditing = Boolean(initialData && initialData.id);
 
+  // Helper to trigger error and scroll smoothly to top
+  const triggerError = (msg) => {
+    setError(msg);
+    formRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Card Reminder Helpers
   const handleAddCard = () => {
     if (cards.length >= 10) return;
@@ -236,8 +253,10 @@ export default function ItemModal({
     setCards((prev) => {
       const updated = [...prev];
       if (field === 'lastDigits') {
-        // Enforce max 4 digits
-        updated[index] = { ...updated[index], [field]: value.replace(/\D/g, '').slice(0, 4) };
+        const rawDigits = value.replace(/\D/g, '');
+        // Perbaikan Pemotongan Digit Paste: Ambil 4 digit TERAKHIR
+        const last4 = rawDigits.length > 4 ? rawDigits.slice(-4) : rawDigits;
+        updated[index] = { ...updated[index], [field]: last4 };
       } else {
         updated[index] = { ...updated[index], [field]: value };
       }
@@ -245,17 +264,25 @@ export default function ItemModal({
     });
   };
 
+  // Auto-Prefix URL onBlur
+  const handleUrlBlur = () => {
+    const trimmed = url.trim();
+    if (trimmed && !/^https?:\/\//i.test(trimmed)) {
+      setUrl(`https://${trimmed}`);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     if (!title.trim()) {
-      setError('Judul kompartemen wajib diisi');
+      triggerError('Judul kompartemen wajib diisi');
       return;
     }
 
     if (type === 'link' && !url.trim()) {
-      setError('Alamat link wajib diisi untuk tautan web');
+      triggerError('Alamat link wajib diisi untuk tautan web');
       return;
     }
 
@@ -264,21 +291,29 @@ export default function ItemModal({
       ? currentUser.name || currentUser.username
       : creator.trim();
     if (!currentUser && (!resolvedCreator || resolvedCreator.toLowerCase() === 'anonim')) {
-      setError('Nama pembuat wajib diisi karena Anda belum login');
+      triggerError('Nama pembuat wajib diisi karena Anda belum login');
       return;
+    }
+
+    // Auto-prefix URL if provided
+    let resolvedUrl = url.trim() || null;
+    if (resolvedUrl && !/^https?:\/\//i.test(resolvedUrl)) {
+      resolvedUrl = `https://${resolvedUrl}`;
     }
 
     // Build metadata payload based on type
     let metadataPayload = {};
-    let resolvedUrl = url.trim() || null;
 
     if (type === 'card_reminder') {
-      const validCards = cards.map((c, i) => ({
-        id: c.id || String(i + 1),
-        label: c.label.trim() || `Kartu ${i + 1}`,
-        lastDigits: c.lastDigits.trim(),
-        expiryDate: c.expiryDate || null,
-      }));
+      // Auto-Prune Kartu Kosong (Ghost Cards): hanya simpan jika lastDigits atau expiryDate terisi
+      const validCards = cards
+        .filter((c) => (c.lastDigits && c.lastDigits.trim()) || (c.expiryDate && c.expiryDate.trim()))
+        .map((c, i) => ({
+          id: c.id || String(i + 1),
+          label: c.label.trim() || `Kartu ${i + 1}`,
+          lastDigits: c.lastDigits.trim(),
+          expiryDate: c.expiryDate || null,
+        }));
       metadataPayload = { cards: validCards };
       resolvedUrl = resolvedUrl || null;
     } else if (type === 'document') {
@@ -327,7 +362,7 @@ export default function ItemModal({
       );
       onClose();
     } catch (err) {
-      setError(err.message || 'Gagal menyimpan kompartemen');
+      triggerError(err.message || 'Gagal menyimpan kompartemen');
     } finally {
       setLoading(false);
     }
@@ -335,11 +370,15 @@ export default function ItemModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#261C14]/60 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-[#261C14]/60 overflow-y-auto"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-3xl bg-[#FFFFFF] border border-[#E5DACB] shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-compartment-title"
+        className="w-full max-w-2xl bg-[#FFFFFF] border-t sm:border border-[#E5DACB] shadow-2xl overflow-hidden fixed bottom-0 inset-x-0 rounded-t-3xl max-h-[92dvh] sm:static sm:inset-auto sm:my-auto sm:rounded-3xl sm:max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header with Vaultra Logo & Brass Inlay */}
@@ -352,11 +391,14 @@ export default function ItemModal({
           {/* Top Brass Hairline Inlay */}
           <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#FFE3B3]/60 to-transparent pointer-events-none" />
 
+          {/* Mobile Sheet Grab Indicator */}
+          <div className="sm:hidden absolute top-1.5 left-1/2 -translate-x-1/2 w-10 h-1 rounded-full bg-white/30 pointer-events-none" />
+
           <div className="flex items-center gap-3 relative z-10">
             <VaultraLogo variant="icon" size={36} className="drop-shadow-md" />
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-extrabold text-[#FAF8F5] drop-shadow-xs">
+                <h2 id="modal-compartment-title" className="text-base sm:text-lg font-extrabold text-[#FAF8F5] drop-shadow-xs">
                   {isEditing ? 'Perbarui Kompartemen Brankas' : 'Tambah ke Kompartemen Brankas'}
                 </h2>
                 <span className="text-[10px] font-mono font-bold bg-[#FFCC00]/20 text-[#FFE3B3] px-2 py-0.5 rounded-full border border-[#FFCC00]/30 hidden sm:inline-block">
@@ -380,7 +422,7 @@ export default function ItemModal({
         </div>
 
         {/* Modal Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+        <form ref={formRef} onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
           {error && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -433,10 +475,11 @@ export default function ItemModal({
 
           {/* 2. Judul Kompartemen (Wajib) */}
           <div>
-            <label className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
+            <label htmlFor="modal-item-title" className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
               Judul Kompartemen <span className="text-rose-500">*</span>
             </label>
             <input
+              id="modal-item-title"
               ref={inputRef}
               type="text"
               required
@@ -486,77 +529,136 @@ export default function ItemModal({
               <div className="space-y-2.5 pt-1">
                 {cards.map((card, idx) => {
                   const expiryInfo = getExpiryDetails(card.expiryDate);
+                  const isLastCard = idx === cards.length - 1;
                   return (
                     <div
                       key={card.id || idx}
-                      className="p-3 rounded-xl bg-[#FFFFFF] border border-[#E5DACB] shadow-xs flex flex-col sm:flex-row sm:items-center gap-2.5 relative"
+                      className="p-3 rounded-xl bg-[#FFFFFF] border border-[#E5DACB] shadow-xs flex flex-col gap-2 relative"
                     >
-                      {/* Nomor urut */}
-                      <span className="text-[11px] font-mono font-bold text-[#8C6239] bg-[#F7EFE4] px-2 py-1 rounded-md shrink-0 self-start sm:self-center">
-                        #{idx + 1}
-                      </span>
-
-                      {/* Label Kartu */}
-                      <div className="flex-1 min-w-[130px]">
-                        <input
-                          type="text"
-                          value={card.label}
-                          onChange={(e) => handleCardChange(idx, 'label', e.target.value)}
-                          placeholder="Label (SIM 1, BCA, dll.)"
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF8F5] border border-[#DEC8B0] text-xs text-[#261C14] placeholder-[#A48F7E] focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100 font-medium"
-                        />
-                      </div>
-
-                      {/* 4 Digit Terakhir */}
-                      <div className="w-28 shrink-0">
-                        <input
-                          type="text"
-                          maxLength={4}
-                          value={card.lastDigits}
-                          onChange={(e) => handleCardChange(idx, 'lastDigits', e.target.value)}
-                          placeholder="4 Digit Akhir"
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF8F5] border border-[#DEC8B0] text-xs text-[#261C14] placeholder-[#A48F7E] font-mono tracking-wider focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100 text-center"
-                        />
-                      </div>
-
-                      {/* Tanggal Kadaluarsa */}
-                      <div className="w-36 shrink-0">
-                        <input
-                          type="date"
-                          value={card.expiryDate}
-                          onChange={(e) => handleCardChange(idx, 'expiryDate', e.target.value)}
-                          className="w-full px-2 py-1.5 rounded-lg bg-[#FAF8F5] border border-[#DEC8B0] text-xs text-[#261C14] focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100"
-                        />
-                      </div>
-
-                      {/* Badge Preview Status */}
-                      <div className="shrink-0">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border ${expiryInfo.badgeClass}`}
-                          title={expiryInfo.label}
-                        >
-                          {expiryInfo.status === 'expired' || expiryInfo.status === 'today' ? (
-                            <AlertCircle className="w-3 h-3" />
-                          ) : expiryInfo.status === 'warning' ? (
-                            <Clock className="w-3 h-3" />
-                          ) : expiryInfo.status === 'safe' || expiryInfo.status === 'attention' ? (
-                            <CheckCircle2 className="w-3 h-3" />
-                          ) : null}
-                          <span>{expiryInfo.shortLabel || expiryInfo.label}</span>
+                      {/* Baris 1: Index, Label, 4 Digit Akhir, dan Tombol Hapus */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-mono font-bold text-[#8C6239] bg-[#F7EFE4] px-2 py-1 rounded-md shrink-0">
+                          #{idx + 1}
                         </span>
+
+                        {/* Label Kartu */}
+                        <div className="flex-1 min-w-[120px]">
+                          <input
+                            id={`card-label-${card.id || idx}`}
+                            aria-label={`Label Kartu #${idx + 1}`}
+                            type="text"
+                            value={card.label}
+                            onChange={(e) => handleCardChange(idx, 'label', e.target.value)}
+                            placeholder="Label (SIM 1, BCA, dll.)"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF8F5] border border-[#DEC8B0] text-xs text-[#261C14] placeholder-[#A48F7E] focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100 font-medium"
+                          />
+                        </div>
+
+                        {/* 4 Digit Terakhir */}
+                        <div className="w-28 shrink-0">
+                          <input
+                            id={`card-digits-${card.id || idx}`}
+                            aria-label={`4 Digit Akhir Kartu #${idx + 1}`}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={card.lastDigits}
+                            onChange={(e) => handleCardChange(idx, 'lastDigits', e.target.value)}
+                            onPaste={(e) => {
+                              const pasteData = e.clipboardData.getData('text');
+                              const digits = pasteData.replace(/\D/g, '');
+                              if (digits.length > 0) {
+                                e.preventDefault();
+                                handleCardChange(idx, 'lastDigits', digits.slice(-4));
+                              }
+                            }}
+                            onWheel={(e) => e.target.blur()}
+                            placeholder="4 Digit Akhir"
+                            className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF8F5] border border-[#DEC8B0] text-xs text-[#261C14] placeholder-[#A48F7E] font-mono tracking-wider focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100 text-center"
+                          />
+                        </div>
+
+                        {/* Tombol Hapus Baris */}
+                        {cards.length > 1 && (
+                          <button
+                            type="button"
+                            tabIndex={-1}
+                            onClick={() => handleRemoveCard(idx)}
+                            className="p-1.5 rounded-lg text-[#9E8C7C] hover:text-rose-600 hover:bg-rose-50 transition-colors duration-100 cursor-pointer shrink-0"
+                            title="Hapus nomor ini"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
 
-                      {/* Tombol Hapus Baris */}
-                      {cards.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCard(idx)}
-                          className="p-1.5 rounded-lg text-[#9E8C7C] hover:text-rose-600 hover:bg-rose-50 transition-colors duration-100 cursor-pointer self-end sm:self-center"
-                          title="Hapus nomor ini"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      {/* Baris 2: Tanggal Kedaluwarsa, Quick Date Presets, & Badge Status */}
+                      <div className="flex items-center justify-between flex-wrap gap-2 pt-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <input
+                            id={`card-expiry-${card.id || idx}`}
+                            aria-label={`Tanggal Kedaluwarsa Kartu #${idx + 1}`}
+                            type="date"
+                            value={card.expiryDate}
+                            onChange={(e) => handleCardChange(idx, 'expiryDate', e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                if (isLastCard && cards.length < 10) {
+                                  e.preventDefault();
+                                  handleAddCard();
+                                }
+                              }
+                            }}
+                            className="w-36 px-2 py-1.5 rounded-lg bg-[#FAF8F5] border border-[#DEC8B0] text-xs text-[#261C14] focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100"
+                          />
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              onClick={() => handleCardChange(idx, 'expiryDate', addDaysOrYearsToDate(card.expiryDate, { days: 30 }))}
+                              className="px-2 py-1 rounded-md text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                              title="Tambah 30 Hari"
+                            >
+                              +30 Hari
+                            </button>
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              onClick={() => handleCardChange(idx, 'expiryDate', addDaysOrYearsToDate(card.expiryDate, { days: 60 }))}
+                              className="px-2 py-1 rounded-md text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                              title="Tambah 60 Hari"
+                            >
+                              +60 Hari
+                            </button>
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              onClick={() => handleCardChange(idx, 'expiryDate', addDaysOrYearsToDate(card.expiryDate, { years: 1 }))}
+                              className="px-2 py-1 rounded-md text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                              title="Tambah 1 Tahun"
+                            >
+                              +1 Tahun
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Badge Preview Status */}
+                        <div className="shrink-0">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border ${expiryInfo.badgeClass}`}
+                            title={expiryInfo.label}
+                          >
+                            {expiryInfo.status === 'expired' || expiryInfo.status === 'today' ? (
+                              <AlertCircle className="w-3 h-3" />
+                            ) : expiryInfo.status === 'warning' ? (
+                              <Clock className="w-3 h-3" />
+                            ) : expiryInfo.status === 'safe' || expiryInfo.status === 'attention' ? (
+                              <CheckCircle2 className="w-3 h-3" />
+                            ) : null}
+                            <span>{expiryInfo.shortLabel || expiryInfo.label}</span>
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -572,10 +674,11 @@ export default function ItemModal({
             <div className="p-4 rounded-2xl bg-[#FBF7F0] border border-[#DFC9B0] space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="doc-type" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Jenis Dokumen
                   </label>
                   <select
+                    id="doc-type"
                     value={docType}
                     onChange={(e) => setDocType(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-[#FAF8F5] border border-[#DEC8B0] text-xs sm:text-sm text-[#261C14] font-medium focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100"
@@ -591,10 +694,11 @@ export default function ItemModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="doc-number" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Nomor Dokumen / NIK
                   </label>
                   <input
+                    id="doc-number"
                     type="text"
                     value={docNumber}
                     onChange={(e) => setDocNumber(e.target.value)}
@@ -606,10 +710,11 @@ export default function ItemModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="doc-holder" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Nama Pemilik Dokumen
                   </label>
                   <input
+                    id="doc-holder"
                     type="text"
                     value={docHolder}
                     onChange={(e) => setDocHolder(e.target.value)}
@@ -619,10 +724,42 @@ export default function ItemModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
-                    Masa Berlaku (Kosongkan jika Seumur Hidup)
-                  </label>
+                  <div className="flex items-center justify-between mb-1 gap-1 flex-wrap">
+                    <label htmlFor="doc-expiry" className="block text-xs font-bold text-[#261C14] uppercase tracking-wider">
+                      Masa Berlaku (Kosongkan jika Seumur Hidup)
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setDocExpiry(addDaysOrYearsToDate(docExpiry, { days: 30 }))}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Tambah 30 Hari"
+                      >
+                        +30 Hari
+                      </button>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setDocExpiry(addDaysOrYearsToDate(docExpiry, { days: 60 }))}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Tambah 60 Hari"
+                      >
+                        +60 Hari
+                      </button>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setDocExpiry(addDaysOrYearsToDate(docExpiry, { years: 1 }))}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Tambah 1 Tahun"
+                      >
+                        +1 Tahun
+                      </button>
+                    </div>
+                  </div>
                   <input
+                    id="doc-expiry"
                     type="date"
                     value={docExpiry}
                     onChange={(e) => setDocExpiry(e.target.value)}
@@ -632,10 +769,11 @@ export default function ItemModal({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                <label htmlFor="doc-notes" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                   Catatan Tambahan
                 </label>
                 <input
+                  id="doc-notes"
                   type="text"
                   value={docNotes}
                   onChange={(e) => setDocNotes(e.target.value)}
@@ -651,10 +789,11 @@ export default function ItemModal({
             <div className="p-4 rounded-2xl bg-[#FBF7F0] border border-[#DFC9B0] space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="bill-provider" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Penyedia / Layanan
                   </label>
                   <input
+                    id="bill-provider"
                     type="text"
                     value={billProvider}
                     onChange={(e) => setBillProvider(e.target.value)}
@@ -664,10 +803,11 @@ export default function ItemModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="bill-account-no" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Nomor Pelanggan / Rekening
                   </label>
                   <input
+                    id="bill-account-no"
                     type="text"
                     value={billAccountNo}
                     onChange={(e) => setBillAccountNo(e.target.value)}
@@ -679,23 +819,64 @@ export default function ItemModal({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="bill-amount" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Estimasi Nominal (Rp)
                   </label>
                   <input
+                    id="bill-amount"
                     type="number"
+                    inputMode="numeric"
                     value={billAmount}
                     onChange={(e) => setBillAmount(e.target.value)}
+                    onWheel={(e) => e.target.blur()}
                     placeholder="Contoh: 250000"
-                    className="w-full px-3 py-2 rounded-xl bg-[#FAF8F5] border border-[#DEC8B0] text-xs sm:text-sm text-[#261C14] placeholder-[#A48F7E] focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100"
+                    className="w-full px-3 py-2 rounded-xl bg-[#FAF8F5] border border-[#DEC8B0] text-xs sm:text-sm text-[#261C14] placeholder-[#A48F7E] focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100 font-mono"
                   />
+                  {billAmount && (
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-[#8C6239] bg-[#F7EFE4] px-2 py-0.5 rounded-md border border-[#DFC9B0] w-fit">
+                      <span>Preview:</span>
+                      <span className="font-mono">{formatIDR(billAmount)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
-                    Tanggal Jatuh Tempo
-                  </label>
+                  <div className="flex items-center justify-between mb-1 gap-1 flex-wrap">
+                    <label htmlFor="bill-due-date" className="block text-xs font-bold text-[#261C14] uppercase tracking-wider">
+                      Tanggal Jatuh Tempo
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setBillDueDate(addDaysOrYearsToDate(billDueDate, { days: 30 }))}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Tambah 30 Hari"
+                      >
+                        +30 Hari
+                      </button>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setBillDueDate(addDaysOrYearsToDate(billDueDate, { days: 60 }))}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Tambah 60 Hari"
+                      >
+                        +60 Hari
+                      </button>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setBillDueDate(addDaysOrYearsToDate(billDueDate, { years: 1 }))}
+                        className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#F5EEDB] hover:bg-[#EADBCE] text-[#5C4533] border border-[#DEC8B0] transition-colors duration-100 cursor-pointer whitespace-nowrap active:scale-95"
+                        title="Tambah 1 Tahun"
+                      >
+                        +1 Tahun
+                      </button>
+                    </div>
+                  </div>
                   <input
+                    id="bill-due-date"
                     type="date"
                     value={billDueDate}
                     onChange={(e) => setBillDueDate(e.target.value)}
@@ -704,10 +885,11 @@ export default function ItemModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="bill-frequency" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Frekuensi
                   </label>
                   <select
+                    id="bill-frequency"
                     value={billFrequency}
                     onChange={(e) => setBillFrequency(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-[#FAF8F5] border border-[#DEC8B0] text-xs sm:text-sm text-[#261C14] font-medium focus:outline-none focus:ring-1 focus:ring-[#8C6239] transition-colors duration-100"
@@ -726,10 +908,11 @@ export default function ItemModal({
             <div className="p-4 rounded-2xl bg-[#FBF7F0] border border-[#DFC9B0] space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="cred-username" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Akun / Email / Username
                   </label>
                   <input
+                    id="cred-username"
                     type="text"
                     value={credUsername}
                     onChange={(e) => setCredUsername(e.target.value)}
@@ -739,11 +922,12 @@ export default function ItemModal({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                  <label htmlFor="cred-secret" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                     Sandi / Kunci Rahasia / Token
                   </label>
                   <div className="relative">
                     <input
+                      id="cred-secret"
                       type={showSecret ? 'text' : 'password'}
                       value={credSecret}
                       onChange={(e) => setCredSecret(e.target.value)}
@@ -752,6 +936,7 @@ export default function ItemModal({
                     />
                     <button
                       type="button"
+                      tabIndex={-1}
                       onClick={() => setShowSecret((prev) => !prev)}
                       className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#8C7460] hover:text-[#261C14] cursor-pointer"
                       title={showSecret ? 'Sembunyikan sandi' : 'Tampilkan sandi'}
@@ -763,10 +948,11 @@ export default function ItemModal({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                <label htmlFor="cred-notes" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                   Catatan Kredensial / Recovery Code
                 </label>
                 <input
+                  id="cred-notes"
                   type="text"
                   value={credNotes}
                   onChange={(e) => setCredNotes(e.target.value)}
@@ -781,10 +967,11 @@ export default function ItemModal({
           {type === 'note' && (
             <div className="p-4 rounded-2xl bg-[#FBF7F0] border border-[#DFC9B0] space-y-3">
               <div>
-                <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                <label htmlFor="note-category" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                   Kategori Catatan
                 </label>
                 <input
+                  id="note-category"
                   type="text"
                   value={noteCategory}
                   onChange={(e) => setNoteCategory(e.target.value)}
@@ -794,10 +981,11 @@ export default function ItemModal({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
+                <label htmlFor="note-content" className="block text-xs font-bold text-[#261C14] mb-1 uppercase tracking-wider">
                   Isi Catatan Rahasia
                 </label>
                 <textarea
+                  id="note-content"
                   rows={4}
                   value={noteContent}
                   onChange={(e) => setNoteContent(e.target.value)}
@@ -811,7 +999,7 @@ export default function ItemModal({
           {/* F. TIPE: LINK WEB / URL (atau opsional link untuk kompartemen lain) */}
           {(type === 'link' || type === 'bill' || type === 'credential') && (
             <div>
-              <label className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
+              <label htmlFor="item-url" className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
                 {type === 'link' ? (
                   <>Link URL <span className="text-rose-500">*</span></>
                 ) : (
@@ -819,10 +1007,12 @@ export default function ItemModal({
                 )}
               </label>
               <input
+                id="item-url"
                 type="url"
                 required={type === 'link'}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
+                onBlur={handleUrlBlur}
                 placeholder={type === 'link' ? 'https://drive.google.com/...' : 'https://portal.layanan.com'}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF8F5] border border-[#E5DACB] text-[#261C14] text-xs sm:text-sm placeholder-[#9E8C7C] focus:outline-none focus:ring-2 focus:ring-[#8C6239]/25 focus:border-[#8C6239] transition-colors duration-100 font-mono"
               />
@@ -835,7 +1025,7 @@ export default function ItemModal({
               {currentUser ? (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-[#261C14] uppercase tracking-wider">
+                    <label htmlFor="item-creator-readonly" className="text-xs font-bold text-[#261C14] uppercase tracking-wider">
                       Pembuat
                     </label>
                     <span className="text-[10px] font-bold text-[#4A6B3D] bg-[#F0F6EE] px-1.5 py-0.5 rounded border border-[#4A6B3D]/30">
@@ -844,6 +1034,7 @@ export default function ItemModal({
                   </div>
                   <div className="relative">
                     <input
+                      id="item-creator-readonly"
                       type="text"
                       readOnly
                       value={currentUser.name || currentUser.username}
@@ -857,7 +1048,7 @@ export default function ItemModal({
               ) : (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-bold text-[#261C14] uppercase tracking-wider">
+                    <label htmlFor="item-creator" className="text-xs font-bold text-[#261C14] uppercase tracking-wider">
                       Pembuat <span className="text-rose-500">*</span>
                     </label>
                     <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
@@ -865,6 +1056,7 @@ export default function ItemModal({
                     </span>
                   </div>
                   <input
+                    id="item-creator"
                     type="text"
                     required
                     value={creator}
@@ -877,10 +1069,11 @@ export default function ItemModal({
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
+              <label htmlFor="item-source-email" className="block text-xs font-bold text-[#261C14] mb-1.5 uppercase tracking-wider">
                 Asal Email (Opsional)
               </label>
               <input
+                id="item-source-email"
                 type="email"
                 value={sourceEmail}
                 onChange={(e) => setSourceEmail(e.target.value)}
@@ -956,12 +1149,13 @@ export default function ItemModal({
           {/* 6. Dropdown Berbagi ke User Tertentu jika Private */}
           {isPrivate && (
             <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#E5DACB] space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-[#8C6239]">
+              <label htmlFor="item-shared-with" className="flex items-center gap-1.5 text-xs font-semibold text-[#8C6239]">
                 <Share2 className="w-3.5 h-3.5" />
                 <span>Bagikan Akses Private ke User Tertentu:</span>
-              </div>
+              </label>
               <div className="relative">
                 <select
+                  id="item-shared-with"
                   value={sharedWith}
                   onChange={(e) => setSharedWith(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-[#FFFFFF] border border-[#E5DACB] text-[#261C14] text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#8C6239]/30 focus:border-[#8C6239] transition-colors duration-100 cursor-pointer"
@@ -977,13 +1171,13 @@ export default function ItemModal({
             </div>
           )}
 
-          {/* Modal Footer Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#F5EFEB] shrink-0">
+          {/* Modal Sticky Footer Actions with Safe-Area Padding */}
+          <div className="sticky bottom-0 bg-[#FFFFFF] flex items-center justify-end gap-2.5 px-4 sm:px-6 py-3.5 border-t border-[#E5DACB] shrink-0 mt-4 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] pb-[max(0.875rem,env(safe-area-inset-bottom))] z-10">
             <button
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-[#786858] hover:text-[#261C14] hover:bg-[#F5EFEB] transition-colors duration-100 cursor-pointer"
+              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-[#786858] hover:text-[#261C14] hover:bg-[#F5EFEB] transition-colors duration-100 cursor-pointer"
             >
               Batal
             </button>

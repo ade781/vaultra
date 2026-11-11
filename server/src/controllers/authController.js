@@ -38,13 +38,7 @@ async function login(req, res, next) {
       return res.status(401).json({ error: 'Username atau password salah' });
     }
 
-    const isBcryptMatch = await bcrypt.compare(password, user.password);
-    const isMatch =
-      isBcryptMatch ||
-      password === 'admin123' ||
-      password === 'user123' ||
-      password === 'password123' ||
-      password === `${user.username}123`;
+    const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
       return res.status(401).json({ error: 'Username atau password salah' });

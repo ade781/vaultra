@@ -21,7 +21,7 @@ export default function UrgentAlertRibbon({
 
   return (
     <div
-      className="w-full mb-6 rounded-2xl border border-[#D49132]/70 shadow-lg shadow-[#8C6239]/15 overflow-hidden relative transition-all"
+      className="w-full mb-6 rounded-2xl border border-[#D49132]/70 shadow-lg shadow-[#8C6239]/15 overflow-hidden relative"
       style={{
         backgroundImage: `linear-gradient(135deg, rgba(42, 20, 10, 0.94) 0%, rgba(58, 28, 14, 0.92) 50%, rgba(32, 14, 6, 0.96) 100%), url(${ribbonWood})`,
         backgroundSize: 'cover',
@@ -38,8 +38,10 @@ export default function UrgentAlertRibbon({
         
         {/* Left: Icon & Description */}
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF9800] to-[#E65100] border border-[#FFD54F]/70 flex items-center justify-center text-white shrink-0 shadow-md">
-            <ShieldAlert className="w-5 h-5 stroke-[2.2] animate-bounce" />
+          <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF9800] to-[#E65100] border border-[#FFD54F]/70 flex items-center justify-center text-white shrink-0 shadow-md shadow-[#FF9800]/25">
+            {/* Ambient breathing brass glow */}
+            <div className="absolute inset-0 rounded-xl bg-[#FFE3B3]/25 animate-pulse pointer-events-none" />
+            <ShieldAlert className="w-5 h-5 stroke-[2.2] relative z-10 text-[#FFFBF2]" />
           </div>
 
           <div>
@@ -74,7 +76,7 @@ export default function UrgentAlertRibbon({
           <button
             type="button"
             onClick={onSelectUrgentFilter}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold cursor-pointer border transition-colors duration-100 shadow-md ${
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold cursor-pointer border shadow-md active:scale-[0.98] active:translate-y-0.5 transition-transform duration-100 ${
               isCurrentFilterUrgent
                 ? 'bg-[#FFE3B3] text-[#261408] border-[#FFF2CE] ring-2 ring-[#FFB84D]'
                 : 'bg-gradient-to-r from-[#D49132] to-[#B46D19] text-[#FFF9F2] border-[#FFE3B3]/40 hover:from-[#E5A344] hover:to-[#C67E25]'

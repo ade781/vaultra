@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useId } from 'react';
+import { playSwitchSound, triggerHaptic } from '../utils/soundHelper';
 
 /**
  * PullCord - Ultra Low-INP Elastic Lamp Pull String (< 16ms Pointer Response)
@@ -10,6 +11,9 @@ export default function PullCord({ isLampOn, onToggle }) {
   const REST_LENGTH = 64; // resting length in pixels
   const TRIGGER_DIST = 36; // distance needed to trigger lamp switch
   const MAX_STRETCH = 145; // maximum stretch constraint
+
+  const beadWoodId = useId();
+  const beadBrassId = useId();
 
   const pathStringRef = useRef(null);
   const pathHighlightRef = useRef(null);
@@ -41,7 +45,7 @@ export default function PullCord({ isLampOn, onToggle }) {
 
     if (pathStringRef.current) pathStringRef.current.setAttribute('d', d);
     if (pathHighlightRef.current) pathHighlightRef.current.setAttribute('d', d);
-    if (beadGroupRef.current) beadGroupRef.current.setAttribute('transform', `translate(${beadX}, ${beadY})`);
+    if (beadGroupRef.current) beadGroupRef.current.setAttribute('transform', `translate(${beadX}, ${beadY}) rotate(${x * 0.75})`);
   }, []);
 
   // Spring Snapback Animation Loop (Damped harmonic spring + pendulum sway)
@@ -50,10 +54,10 @@ export default function PullCord({ isLampOn, onToggle }) {
       cancelAnimationFrame(stateRef.current.animId);
     }
 
-    const springK = 0.085;
-    const dampingY = 0.76;
-    const pendK = 0.045;
-    const dampingX = 0.88;
+    const springK = 0.09;
+    const dampingY = 0.84;
+    const pendK = 0.05;
+    const dampingX = 0.92;
 
     const step = () => {
       const s = stateRef.current;
@@ -70,7 +74,7 @@ export default function PullCord({ isLampOn, onToggle }) {
 
       updateDOMCoords(s.x, s.y);
 
-      if (Math.abs(dy) > 0.4 || Math.abs(s.vy) > 0.4 || Math.abs(s.x) > 0.4 || Math.abs(s.vx) > 0.4) {
+      if (Math.abs(dy) > 0.08 || Math.abs(s.vy) > 0.08 || Math.abs(s.x) > 0.08 || Math.abs(s.vx) > 0.08) {
         s.animId = requestAnimationFrame(step);
       } else {
         s.y = REST_LENGTH;
@@ -141,6 +145,8 @@ export default function PullCord({ isLampOn, onToggle }) {
     // Trigger toggle decoupled from the pointer event frame (Guarantees < 16ms INP)
     if (!s.hasToggled && newY - REST_LENGTH >= TRIGGER_DIST) {
       s.hasToggled = true;
+      playSwitchSound(!isLampOn);
+      triggerHaptic([15, 20]);
       setTimeout(() => {
         if (onToggle) onToggle();
       }, 0);
@@ -170,6 +176,8 @@ export default function PullCord({ isLampOn, onToggle }) {
     const rawDy = e.clientY - s.startY;
     if (!s.hasToggled && Math.abs(rawDy) < 8) {
       s.hasToggled = true;
+      playSwitchSound(!isLampOn);
+      triggerHaptic([15, 20]);
       setTimeout(() => {
         if (onToggle) onToggle();
       }, 0);
@@ -208,14 +216,14 @@ export default function PullCord({ isLampOn, onToggle }) {
         className="overflow-visible pointer-events-none"
       >
         <defs>
-          <linearGradient id="beadWood" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={beadWoodId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#D4A373" />
             <stop offset="35%" stopColor="#A86E3C" />
             <stop offset="70%" stopColor="#7A4C24" />
             <stop offset="100%" stopColor="#4A2B11" />
           </linearGradient>
 
-          <linearGradient id="beadBrass" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient id={beadBrassId} x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="#FFF2CE" />
             <stop offset="50%" stopColor="#FFCC00" />
             <stop offset="100%" stopColor="#9E6B28" />
@@ -244,10 +252,10 @@ export default function PullCord({ isLampOn, onToggle }) {
           strokeLinecap="round"
         />
 
-        {/* 2. Bead Group with Hardware-Accelerated CSS Drop-Shadow */}
+        {/* 2. Bead Group with Hardware-Accelerated CSS Drop-Shadow & Dynamic Tilt */}
         <g 
           ref={beadGroupRef} 
-          transform={`translate(${initialBeadX}, ${initialBeadY})`}
+          transform={`translate(${initialBeadX}, ${initialBeadY}) rotate(0)`}
           style={{ filter: 'drop-shadow(1px 3px 2px rgba(0,0,0,0.8))' }}
         >
           <rect
@@ -256,7 +264,7 @@ export default function PullCord({ isLampOn, onToggle }) {
             width="4"
             height="3"
             rx="1"
-            fill="url(#beadBrass)"
+            fill={`url(#${beadBrassId})`}
             stroke="#5C3B14"
             strokeWidth="0.5"
           />
@@ -265,7 +273,7 @@ export default function PullCord({ isLampOn, onToggle }) {
           <g>
             <path
               d="M 0 0 C 6 2, 7 12, 4 19 C 2 23, -2 23, -4 19 C -7 12, -6 2, 0 0 Z"
-              fill="url(#beadWood)"
+              fill={`url(#${beadWoodId})`}
               stroke={isLampOn ? '#FFE2A8' : '#6B4522'}
               strokeWidth="0.8"
             />
@@ -276,7 +284,7 @@ export default function PullCord({ isLampOn, onToggle }) {
               width="9"
               height="2"
               rx="0.5"
-              fill="url(#beadBrass)"
+              fill={`url(#${beadBrassId})`}
             />
 
             <ellipse
@@ -292,7 +300,7 @@ export default function PullCord({ isLampOn, onToggle }) {
               cx="0"
               cy="20.5"
               r="2"
-              fill="url(#beadBrass)"
+              fill={`url(#${beadBrassId})`}
               stroke="#4A2B11"
               strokeWidth="0.4"
             />
